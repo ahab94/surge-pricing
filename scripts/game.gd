@@ -68,6 +68,9 @@ var result_stars := 0
 var route_points := PackedVector2Array()
 var arrow_dir := Vector2.ZERO
 var popups: Array = []
+var splashes: Array = []         # {pos, t}: water splashes playing out
+var splash_hold := 0.0           # seconds the car stays sunk before it respawns
+var splash_pos := Vector2.ZERO
 var clock_time := 0.0
 
 var _route_timer := 0.0
@@ -155,6 +158,8 @@ func start_level(i: int) -> void:
 	ride = {}
 	waiting.clear()
 	popups.clear()
+	splashes.clear()
+	splash_hold = 0.0
 	surge_zones.clear()
 	fail_reason = ""
 	result_stars = 0
@@ -165,6 +170,8 @@ func start_level(i: int) -> void:
 	for k in int(level.waiting):
 		_spawn_request()
 	bot = Autopilot.new() if _flags.has("autopilot") else null
+	if bot:
+		bot.stunts = _flags.has("stunts")
 	state = State.DRIVING
 
 	var s: Vector2 = city.size_px()
@@ -180,6 +187,8 @@ func start_level(i: int) -> void:
 		world.visible = false
 		view.on_level(self)
 	hud.show_level(level_index, level)
+	if _flags.has("clean"):
+		hud.hide_tip()   # footage for videos: captions replace the tip
 	_update_hud()
 
 
@@ -291,7 +300,17 @@ func _physics_process(delta: float) -> void:
 		car.throttle = -1.0
 		car.steer = 0.0
 		car.drift = false
-	car.step(delta, city)
+	# After a splash the car stays under water for a beat (the camera lingers
+	# on the splash) before reappearing on the bank.
+	if splash_hold > 0.0:
+		splash_hold -= delta
+		car.vel = Vector2.ZERO
+		car.events.clear()   # step() isn't running, so don't replay its last events
+	else:
+		car.step(delta, city)
+	for sp in splashes:
+		sp.t += delta
+	splashes = splashes.filter(func(sp) -> bool: return sp.t < 1.6)
 	traffic.update(delta, car)
 	if state == State.DRIVING:
 		_traffic_contacts()
@@ -393,6 +412,9 @@ func _on_event(e: Dictionary) -> void:
 			crashes += 1
 			if riding:
 				ride.mood += 12.0 if ride.kind == "streamer" else -30.0
+			splash_pos = e.at
+			splash_hold = 1.2
+			splashes.append({"pos": e.at, "t": 0.0})
 			_popup("SPLASH!", Color("37b7ff"), 46)
 		"takeoff":
 			pass

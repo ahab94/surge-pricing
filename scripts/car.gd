@@ -152,7 +152,7 @@ func _fly(dt: float, city) -> void:
 	air = 0.0
 	_ramp_cd = 0.6   # don't relaunch off the ramp on the far bank
 	if city.cell(city.tile_of(position)) == "~":
-		events.append({"type": "splash"})
+		events.append({"type": "splash", "at": position})
 		position = last_safe
 		vel = Vector2.ZERO
 	else:

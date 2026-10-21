@@ -18,6 +18,7 @@ const NANA_CAP := 430.0        # stays under Riders.SPEEDY with Nana aboard
 const KEEP_RIGHT := 14.0
 const OVERTAKE := 32.0
 
+var stunts := false            # show-off routing over ramps (for videos)
 var _target := Vector2i(-1, -1)
 var _path: Array = []
 var _repath := 0.0
@@ -36,7 +37,7 @@ func drive(game) -> Dictionary:
 	if target != _target or _repath <= 0.0 or _path.is_empty():
 		_target = target
 		_repath = 0.25
-		_path = city.route(here, target) if target.x >= 0 else []
+		_path = city.route(here, target, stunts) if target.x >= 0 else []
 
 	var out := {"throttle": 0.0, "steer": 0.0, "drift": false}
 	if _path.is_empty():
@@ -109,8 +110,18 @@ func drive(game) -> Dictionary:
 	if not game.ride.is_empty() and game.ride.kind == "nana":
 		want = minf(want, NANA_CAP)
 	want = minf(want, float(lane[1]))
+	if stunts and _jump_ahead(game.city):
+		want = 800.0   # flat out: anything slower ends in the canal
 	out.throttle = clampf((want - v) / 90.0, -1.0, 1.0)
 	return out
+
+
+## A ramp with water right after it within the next few tiles of the route.
+func _jump_ahead(city) -> bool:
+	for i in range(0, mini(_path.size() - 1, 6)):
+		if city.cell(_path[i]) == "^" and city.cell(_path[i + 1]) == "~":
+			return true
+	return false
 
 
 func _arriving(game) -> bool:

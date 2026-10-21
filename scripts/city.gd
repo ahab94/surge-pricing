@@ -168,23 +168,37 @@ func push_out(p: Vector2, r: float, airborne := false) -> Vector2:
 
 ## Cost of driving onto a tile. The route sticks to roads, cuts across grass
 ## only when it saves a lot, and avoids ramps (the app is not reckless; you are).
-func _cost(t: Vector2i) -> int:
+func _cost(t: Vector2i, stunt := false) -> int:
 	var c := cell(t)
 	if c == ",":
 		return 4
 	if c == "^":
-		return 30
+		return 1 if stunt else 30
+	if c == "~" and stunt and _jump_lane(t):
+		return 1   # flown over, not driven
 	if is_road(t):
 		return 1
 	return INF
 
 
+## Water you can jump: a straight north-south run with a ramp at each end.
+func _jump_lane(t: Vector2i) -> bool:
+	var up := t
+	while cell(up) == "~":
+		up.y -= 1
+	var down := t
+	while cell(down) == "~":
+		down.y += 1
+	return cell(up) == "^" and cell(down) == "^"
+
+
 ## Cost-to-go from every tile to `dest`, computed once per destination with
 ## Dijkstra's algorithm. Costs are small integers, so a list of buckets (one
 ## per cost) replaces the usual priority queue.
-func _field(dest: Vector2i) -> PackedInt32Array:
-	if _fields.has(dest):
-		return _fields[dest]
+func _field(dest: Vector2i, stunt := false) -> PackedInt32Array:
+	var key := Vector3i(dest.x, dest.y, 1 if stunt else 0)
+	if _fields.has(key):
+		return _fields[key]
 	var dist := PackedInt32Array()
 	dist.resize(w * h)
 	dist.fill(INF)
@@ -204,7 +218,7 @@ func _field(dest: Vector2i) -> PackedInt32Array:
 				continue   # a cheaper way here was found after this was queued
 			for d in DIRS:
 				var n: Vector2i = t + d
-				var step := _cost(n)
+				var step := _cost(n, stunt)
 				if step >= INF or n.x < 0 or n.y < 0 or n.x >= w or n.y >= h:
 					continue
 				var nc := c + step
@@ -214,13 +228,15 @@ func _field(dest: Vector2i) -> PackedInt32Array:
 						buckets[nc] = []
 					buckets[nc].append(n)
 					pending += 1
-	_fields[dest] = dist
+	_fields[key] = dist
 	return dist
 
 
 ## Tiles from `from` to `dest`, both included. Empty if there's no way.
-func route(from: Vector2i, dest: Vector2i) -> Array:
-	var f := _field(dest)
+## With `stunt`, the route happily takes ramps and jumps the canal (the bot's
+## show-off mode for recording videos).
+func route(from: Vector2i, dest: Vector2i, stunt := false) -> Array:
+	var f := _field(dest, stunt)
 	var out: Array = [from]
 	var t := from
 	if from.x < 0 or from.y < 0 or from.x >= w or from.y >= h or f[t.y * w + t.x] >= INF:
@@ -253,8 +269,8 @@ func route(from: Vector2i, dest: Vector2i) -> Array:
 	return out
 
 
-func route_cost(from: Vector2i, dest: Vector2i) -> int:
-	return _field(dest)[from.y * w + from.x]
+func route_cost(from: Vector2i, dest: Vector2i, stunt := false) -> int:
+	return _field(dest, stunt)[from.y * w + from.x]
 
 
 # ---------------------------------------------------------------- drawing

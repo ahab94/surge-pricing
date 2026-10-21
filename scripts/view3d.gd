@@ -554,6 +554,7 @@ func sync(game, delta: float) -> void:
 	var car = game.car
 	var lift: float = car.get_meta("lift", 0.0)
 	_car.position = p3(car.position, lift * 2.4)
+	_car.visible = game.splash_hold <= 0.0   # sunk, waiting to respawn
 	_car.rotation = Vector3(0, -car.heading, 0)
 	# A little body roll in turns and pitch in the air sells the speed.
 	_car.rotation.x = -car.steer * clampf(car.speed() / 700.0, 0, 1) * 0.12
@@ -575,7 +576,8 @@ func _follow_camera(game, delta: float) -> void:
 	var ahead: Vector2 = (car.vel * 0.35).limit_length(220.0)
 	# Clamp so the camera doesn't stare at the harbour past the map's edges.
 	var lim: Vector2 = game.city.size_px()
-	var focus: Vector2 = (car.position + ahead).clamp(Vector2(6 * 128, 4 * 128), lim - Vector2(6 * 128, 3 * 128))
+	var focus: Vector2 = (car.position + ahead) if game.splash_hold <= 0.0 else game.splash_pos
+	focus = focus.clamp(Vector2(6 * 128, 4 * 128), lim - Vector2(6 * 128, 3 * 128))
 	var want := p3(focus)
 	_cam_target = _cam_target.lerp(want, clampf(delta * 6.0, 0.0, 1.0))
 	var rush := clampf(car.speed() / 720.0, 0.0, 1.0)
@@ -646,6 +648,8 @@ func _draw_fx(game) -> void:
 		_disc(im, p3(z.pos, 0.06), z.r / S, Color(SURGE, 0.12 + 0.08 * pulse), 40)
 		_ring(im, p3(z.pos, 0.07), z.r / S, 0.25, Color(SURGE, 0.8), 48)
 	_skids(im, game.car.skids)
+	for sp in game.splashes:
+		_splash(im, p3(sp.pos, WATER_Y + 0.05), sp.t)
 	_route(im, game.route_points, Color(ROUTE, 0.9 if not game.ride.is_empty() else 0.45))
 	var beam_i := 0
 	for w in game.waiting:
@@ -717,6 +721,23 @@ func _beam(im: ImmediateMesh, c: Vector3, col: Color, alpha: float) -> void:
 		im.surface_add_vertex(p1 + Vector3(0, h, 0))
 		im.surface_set_color(top)
 		im.surface_add_vertex(p0 + Vector3(0, h, 0))
+
+
+## A splash: white rings racing outwards and droplets thrown up and falling.
+func _splash(im: ImmediateMesh, c: Vector3, t: float) -> void:
+	var fade := clampf(1.0 - t / 1.6, 0.0, 1.0)
+	_ring(im, c, 0.6 + t * 4.5, 0.35, Color(1, 1, 1, 0.8 * fade), 32)
+	_ring(im, c, 0.3 + t * 2.5, 0.25, Color(1, 1, 1, 0.6 * fade), 24)
+	_disc(im, c + Vector3(0, 0.02, 0), 1.6 * fade + 0.2, Color(0.85, 0.95, 1.0, 0.7 * fade), 20)
+	for i in 18:
+		var a := i * 2.4
+		var spd := 2.0 + float(i % 5) * 0.8
+		var up := 7.0 + float(i % 3) * 2.5
+		var y := up * t - 9.8 * t * t
+		if y < 0.0:
+			continue
+		var p := c + Vector3(cos(a) * spd * t, y, sin(a) * spd * t)
+		_disc(im, p, 0.22, Color(1, 1, 1, 0.9 * fade), 6)
 
 
 func _route(im: ImmediateMesh, pts: PackedVector2Array, col: Color) -> void:

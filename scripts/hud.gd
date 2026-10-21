@@ -139,6 +139,11 @@ func show_level(index: int, level: Dictionary) -> void:
 	_stick_index = -1
 
 
+func hide_tip() -> void:
+	_tip_time = 0.0
+	_tip_label.modulate.a = 0.0
+
+
 func update_stats(money: float, goal: float, rating: float, floor_rating: float, clock: float,
 		ride: Dictionary, _waiting: int) -> void:
 	_money = money
