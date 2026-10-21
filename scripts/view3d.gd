@@ -527,6 +527,13 @@ func on_level(game) -> void:
 	_cam_target = p3(game.car.position)
 
 
+## Where the top of the car is on screen, for the speech bubble.
+func car_screen_pos() -> Vector2:
+	if _car == null or not _car.visible:
+		return camera.unproject_position(p3(_smooth_pos, 1.5))
+	return camera.unproject_position(_car.position + Vector3(0, 1.5, 0))
+
+
 ## Physics runs at a fixed 60 ticks a second, but screens refresh at their
 ## own rate (120 Hz, or uneven in a browser). Drawing things exactly where the
 ## last tick left them makes them hop; instead blend between the previous and

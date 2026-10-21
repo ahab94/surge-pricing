@@ -7,18 +7,33 @@ converted to output time here, so re-cutting a segment doesn't break them.
 """
 
 
-def video(vid, orient, segments, cues, intro=0.0, outro=0.0, music_volume=0.55):
+import os
+
+FOOTAGE = os.path.join(os.path.dirname(__file__), "..", "..", "build", "footage")
+
+
+def scale(clip):
+    """Game-seconds per video-second for a clip (recorded with --speed)."""
+    try:
+        with open(os.path.join(FOOTAGE, clip + ".scale")) as f:
+            return float(f.read().strip())
+    except OSError:
+        return 1.0
+
+
+def video(vid, orient, segments, cues, intro=0.0, outro=0.0, music_volume=0.55, split=False, reviews=()):
     """cues: (segment index, source start, source end or None, kind, text-or-sound, extra)
     kind "cap": caption (extra = style); kind "sfx": sound (extra = volume)."""
     starts = []
     t = 0.0
-    for _, a, b, speed in segments:
+    for seg in segments:
+        clip, a, b, speed = seg[:4]
         starts.append(t)
-        t += (b - a) / speed
+        t += (b - a) / scale(clip.split("|")[0]) / speed + (seg[4] if len(seg) > 4 else 0.0)
 
     def out(seg, src_t):
-        _, a, _, speed = segments[seg]
-        return starts[seg] + (src_t - a) / speed
+        clip, a, _, speed = segments[seg][:4]
+        return starts[seg] + (src_t - a) / scale(clip.split("|")[0]) / speed
 
     captions, sfx = [], []
     for seg, s0, s1, kind, what, extra in cues:
@@ -26,8 +41,11 @@ def video(vid, orient, segments, cues, intro=0.0, outro=0.0, music_volume=0.55):
             captions.append((out(seg, s0), out(seg, s1), what, extra))
         else:
             sfx.append((out(seg, s0), what, extra))
+    # reviews: (segment, game time, seconds on screen, name, stars, quote) shown
+    # as a big phone-notification card (split screen: name may be "top"/"bottom").
+    cards = [(out(seg, t0), out(seg, t0) + secs, name, stars, quote) for seg, t0, secs, name, stars, quote in reviews]
     return {"id": vid, "orient": orient, "segments": segments, "captions": captions, "sfx": sfx,
-            "intro": intro, "outro": outro, "music_volume": music_volume}
+            "intro": intro, "outro": outro, "music_volume": music_volume, "split": split, "cards": cards}
 
 
 VIDEOS = [
@@ -127,4 +145,91 @@ VIDEOS = [
             outro=3.0)
       for vid, orient, o in [("short-citizens-arrest", "portrait", "p"),
                              ("special-traffic", "landscape", "l")]],
+
+    # "Same ride. Two passengers." The identical reckless drive, Nana on top,
+    # a Livestreamer below. Their bubbles fire at the same instants.
+    video("short-same-ride", "portrait",
+          segments=[("l-same-nana|l-same-streamer", 11.7, 32.0, 1.0, 3.0)],
+          cues=[
+              (0, 11.7, 15.0, "cap", "Same ride.\nTwo passengers.", "hook_top"),
+              (0, 11.7, 32.0, "cap", "NANA", "tag_top"),
+              (0, 11.7, 32.0, "cap", "LIVESTREAMER", "tag_bottom"),
+              (0, 12.22, 14.9, "cap", "Nice and slow now, dear.", "bubble_top"),
+              (0, 12.22, 14.9, "cap", "Yo chat, we're in a rideshare!", "bubble_bottom"),
+              (0, 15.25, 17.6, "cap", "I'm calling your mother.", "bubble_top"),
+              (0, 15.25, 17.6, "cap", "CLIP IT!", "bubble_bottom"),
+              (0, 15.25, None, "sfx", "bonk", 0.7),
+              (0, 17.90, 20.6, "cap", "MY HIP!", "bubble_top"),
+              (0, 17.90, 20.6, "cap", "CHAT SAW THAT!", "bubble_bottom"),
+              (0, 17.90, None, "sfx", "bonk", 0.7),
+              (0, 20.87, 24.3, "cap", "My dentures!", "bubble_top"),
+              (0, 20.87, 24.3, "cap", "AGAIN! AGAIN!", "bubble_bottom"),
+              (0, 20.87, None, "sfx", "bonk", 0.7),
+              (0, 24.55, 27.0, "cap", "MY HIP!", "bubble_top"),
+              (0, 24.55, 27.0, "cap", "CHAT SAW THAT!", "bubble_bottom"),
+              (0, 24.55, None, "sfx", "bonk", 0.7),
+              (0, 27.21, 30.0, "cap", "I'm calling your mother.", "bubble_top"),
+              (0, 27.21, 30.0, "cap", "AGAIN! AGAIN!", "bubble_bottom"),
+              (0, 30.6, None, "sfx", "sad_trombone", 0.6),
+          ],
+          reviews=[(0, 30.3, 5.5, "top:Grandpa Walt", 1, "My hip has filed a complaint."),
+                   (0, 30.3, 5.5, "bottom:xXBlazeXx", 5, "SUBSCRIBE TO THIS DRIVER")],
+          outro=2.5),
+
+    # "I drove Nana like an action movie." Four rides, four 1-star reviews, deactivated.
+    video("short-nana-action", "portrait",
+          segments=[
+              ("p-nana-action", 4.6, 13.9, 1.0, 2.2),
+              ("p-nana-action", 21.0, 30.4, 1.0, 2.2),
+              ("p-nana-action", 38.9, 44.7, 1.0),
+              ("p-nana-action", 59.6, 71.0, 1.0),
+          ],
+          cues=[
+              (0, 4.6, 8.0, "cap", "I drove Nana like\nan ACTION MOVIE", "hook"),
+              (1, 21.0, 22.6, "cap", "Ride #2", "low"),
+              (2, 38.9, 40.4, "cap", "Ride #3", "low"),
+              (3, 59.6, 61.1, "cap", "Ride #4", "low"),
+              (3, 67.9, None, "sfx", "record_scratch", 0.7),
+              (3, 68.4, None, "sfx", "sad_trombone", 0.8),
+          ],
+          reviews=[(0, 13.65, 2.9, "Nana Rose", 1, "I have seen the other side, young man."),
+                   (1, 30.25, 2.9, "Grandpa Walt", 1, "My hip has filed a complaint.")],
+          outro=2.5),
+
+    # "This passenger reviews you like a LinkedIn post."
+    video("short-hustler", "portrait",
+          segments=[
+              ("p-hustler", 2.6, 24.0, 1.0, 2.6),
+              ("p-hustler", 36.6, 41.5, 1.0, 2.8),
+          ],
+          cues=[
+              (0, 2.6, 6.0, "cap", "This passenger reviews you\nlike a LinkedIn post", "hook"),
+              (0, 5.26, None, "sfx", "bonk", 0.6),
+              (0, 7.47, None, "sfx", "bonk", 0.6),
+              (1, 36.6, 38.2, "cap", "Next Hustle Bro:", "low"),
+          ],
+          reviews=[(0, 15.65, 3.2, "Jaxon.eth", 1, "Time is money. You cost me both."),
+                   (0, 23.9, 3.0, "Chad from Sales", 4, "Moves fast. Breaks things. Respect."),
+                   (1, 41.4, 3.0, "Tyson, Founder", 1, "Slower than our quarterly growth.")],
+          outro=2.5),
+
+    # Livestreamers: the jump, the splash, the walk-out.
+    video("short-streamer", "portrait",
+          segments=[
+              ("p-streamer", 8.9, 14.4, 1.0, 2.6),
+              ("p-streamer", 66.6, 71.0, 1.0),
+              ("p-streamer", 85.4, 87.2, 1.0, 2.8),
+          ],
+          cues=[
+              (0, 8.9, 11.6, "cap", "Livestreamers rate\nyour driving differently", "hook"),
+              (0, 11.0, None, "sfx", "slide_up", 0.7),
+              (0, 11.89, None, "sfx", "boing", 0.7),
+              (1, 66.6, 68.2, "cap", "One ride later...", "low"),
+              (1, 69.12, None, "sfx", "splash", 1.0),
+              (2, 85.4, 86.9, "cap", "...and then a boring ride.", "low"),
+              (2, 87.2, None, "sfx", "record_scratch", 0.7),
+          ],
+          reviews=[(0, 14.35, 3.0, "ChadCam", 5, "Best content of my career. 5 stars + follow."),
+                   (2, 87.15, 3.0, "TotallyNotBot", 1, "Ending stream. Walking.")],
+          outro=2.5),
 ]

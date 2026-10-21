@@ -59,6 +59,9 @@ var _stick_index := -1
 var _stick_origin := Vector2.ZERO
 var _tip_time := 0.0
 var _alert: Label
+var _bubble: PanelContainer
+var _bubble_label: Label
+var _bubble_tail: Polygon2D
 var _alert_time := 0.0
 
 
@@ -117,6 +120,7 @@ func _ready() -> void:
 	_driving_ui.add_child(_alert)
 	_alert.visible = false
 
+	_build_bubble()
 	_build_touch()
 	_build_result_panel()
 	_build_menu()
@@ -160,6 +164,55 @@ func show_level(index: int, level: Dictionary) -> void:
 	_tip_time = 6.0
 	stick = Vector2.ZERO
 	_stick_index = -1
+
+
+# ---------------------------------------------------------------- speech bubble
+
+func _build_bubble() -> void:
+	_bubble = PanelContainer.new()
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color.WHITE
+	sb.set_corner_radius_all(20)
+	sb.set_border_width_all(4)
+	sb.border_color = INK
+	sb.content_margin_left = 18
+	sb.content_margin_right = 18
+	sb.content_margin_top = 8
+	sb.content_margin_bottom = 8
+	_bubble.add_theme_stylebox_override("panel", sb)
+	_bubble.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_bubble_label = _label(30, INK, false)
+	_bubble.add_child(_bubble_label)
+	# The tail: a little triangle pointing down at the car.
+	_bubble_tail = Polygon2D.new()
+	_bubble_tail.polygon = PackedVector2Array([Vector2(-14, -4), Vector2(14, -4), Vector2(0, 22)])
+	_bubble_tail.color = Color.WHITE
+	var edge := Line2D.new()
+	edge.points = PackedVector2Array([Vector2(-14, 0), Vector2(0, 22), Vector2(14, 0)])
+	edge.width = 4
+	edge.default_color = INK
+	_bubble_tail.add_child(edge)
+	_bubble.add_child(_bubble_tail)
+	_bubble.visible = false
+	_driving_ui.add_child(_bubble)
+
+
+## Shows `text` in a bubble whose tail points at `anchor` (screen px). Empty hides it.
+func set_bubble(text: String, anchor: Vector2, alpha: float) -> void:
+	if text == "" or alpha <= 0.0:
+		_bubble.visible = false
+		return
+	if _bubble_label.text != text:
+		_bubble_label.text = text
+		_bubble.reset_size()
+	_bubble.visible = true
+	_bubble.modulate.a = alpha
+	var sz := _bubble.size
+	var pos := anchor - Vector2(sz.x * 0.5, sz.y + 34.0)
+	pos.x = clampf(pos.x, 8.0, size.x - sz.x - 8.0)
+	pos.y = clampf(pos.y, 8.0, size.y - sz.y - 8.0)
+	_bubble.position = pos
+	_bubble_tail.position = Vector2(clampf(anchor.x - pos.x, 24.0, sz.x - 24.0), sz.y - 2.0)
 
 
 ## A flashing app alert under the clock, for special traffic events.

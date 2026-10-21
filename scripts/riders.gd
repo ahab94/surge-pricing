@@ -11,6 +11,8 @@ extends RefCounted
 ## slow     mood per second below CRAWL while riding (impatience).
 ## fare     fare multiplier.  time  time-limit multiplier.
 ## color    the marker and badge colour.
+## says     what they shout in a speech bubble, per moment (pickup, crash,
+##          jump, near, splash, drift, slow, fast, arrest, incident).
 
 const SPEEDY := 470.0
 const CRAWL := 170.0
@@ -28,6 +30,17 @@ const KINDS := {
 			["Is this person a stunt double?? 5 stars", "Arrived before I left. Legend."],
 		],
 		"bail": ["I'll walk, thanks.", "Faster on foot, honestly."],
+		"says": {
+			"pickup": ["Hi! Nice and normal, please.", "Is this car green on purpose?"],
+			"crash": ["DUDE!", "My coffee!!", "I have kids!", "Was that a WALL?!"],
+			"jump": ["WHY ARE WE FLYING", "THIS IS NOT THE ROUTE"],
+			"near": ["Eyes on the road!", "That was SO close!"],
+			"splash": ["I can't swim!!", "Is this a car or a boat?!"],
+			"drift": ["Wheee... wait, no."],
+			"slow": ["Any day now..."],
+			"arrest": ["Did we just catch a criminal?!"],
+			"incident": ["Am I going to jail?!"],
+		},
 	},
 	"streamer": {
 		"label": "Livestreamer", "mood": 55.0, "crash": 6.0, "stunt": 9.0, "tip": 2.5,
@@ -41,6 +54,17 @@ const KINDS := {
 			["SUBSCRIBE TO THIS DRIVER", "Best content of my career. 5 stars + follow."],
 		],
 		"bail": ["This ride is NOT content.", "Ending stream. Walking."],
+		"says": {
+			"pickup": ["Yo chat, we're in a rideshare!", "Do something crazy, I'm LIVE!"],
+			"crash": ["CLIP IT!", "CHAT SAW THAT!", "AGAIN! AGAIN!"],
+			"jump": ["CHAT ARE YOU SEEING THIS?!", "WE'RE GOING VIRAL!"],
+			"near": ["OHHHH!", "So close!! Do it again!"],
+			"splash": ["THIS IS CONTENT!", "Underwater stream, let's go!"],
+			"drift": ["DRIFT KING!"],
+			"slow": ["Bro this is boring.", "Chat is leaving..."],
+			"arrest": ["CITIZEN'S ARREST ON STREAM!"],
+			"incident": ["INTERNATIONAL CONTENT!"],
+		},
 	},
 	"nana": {
 		"label": "Nana", "mood": 92.0, "crash": -25.0, "stunt": -12.0, "tip": 0.0,
@@ -54,6 +78,17 @@ const KINDS := {
 			["Like riding a cloud. Have a butterscotch.", "Such a nice driver. I'll tell my bridge club."],
 		],
 		"bail": ["I'll call my grandson instead.", "I'm taking the bus. It has a bench."],
+		"says": {
+			"pickup": ["Nice and slow now, dear.", "I'm in no hurry, sweetie."],
+			"crash": ["MY HIP!", "Young man!!", "I'm calling your mother.", "My dentures!"],
+			"jump": ["Lord have mercy!", "I've seen the light!"],
+			"near": ["Oh my stars!", "I dropped my knitting!"],
+			"splash": ["My good cardigan!", "Not the river again!"],
+			"drift": ["Is the car sliding, dear?"],
+			"fast": ["Slow down, sonny!", "This isn't a race!"],
+			"arrest": ["Oh! Was that legal?"],
+			"incident": ["I'm writing to the newspaper."],
+		},
 	},
 	"hustler": {
 		"label": "Hustle Bro", "mood": 66.0, "crash": -6.0, "stunt": 3.0, "tip": 1.5,
@@ -67,6 +102,18 @@ const KINDS := {
 			["Hired this driver as COO.", "10x driver. Rise and grind."],
 		],
 		"bail": ["Time is money. You cost me both.", "Jumping on a scooter. Bye."],
+		"says": {
+			"pickup": ["Make it quick. I'm closing a deal.", "Time is money, driver."],
+			"crash": ["That's a write-off.", "Sending you the invoice."],
+			"jump": ["Disruptive. I like it.", "Okay, THIS is a growth hack."],
+			"near": ["Bold move. Respect."],
+			"splash": ["Liquidity event!", "Underwater. Like my startup."],
+			"drift": ["Pivot! PIVOT!"],
+			"slow": ["Is this the scenic route?!", "My meeting started 5 minutes ago."],
+			"fast": ["Now we're scaling!"],
+			"arrest": ["Adding this to my profile."],
+			"incident": ["We're going to need lawyers."],
+		},
 	},
 }
 
@@ -84,3 +131,8 @@ static func review(kind: String, stars: int, rng: RandomNumberGenerator) -> Stri
 static func bail_line(kind: String, rng: RandomNumberGenerator) -> String:
 	var lines: Array = KINDS[kind].bail
 	return lines[rng.randi() % lines.size()]
+
+
+static func say(kind: String, moment: String, rng: RandomNumberGenerator) -> String:
+	var lines: Array = KINDS[kind].says.get(moment, [])
+	return "" if lines.is_empty() else String(lines[rng.randi() % lines.size()])

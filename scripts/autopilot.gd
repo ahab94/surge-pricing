@@ -20,6 +20,7 @@ const OVERTAKE := 32.0
 const PULL_RIGHT := 44.0
 
 var stunts := false            # show-off routing over ramps (for videos)
+var reckless := false          # full speed everywhere, no manners (for funny footage)
 var hunt := false              # chase down and ram the getaway car / motorcade (for videos)
 var _target := Vector2i(-1, -1)
 var _path: Array = []
@@ -129,9 +130,15 @@ func drive(game) -> Dictionary:
 	want = minf(want, sqrt(2.0 * DECEL * maxf(0.0, total - 25.0)) + 20.0)
 	if absf(diff) > 1.0:
 		want = minf(want, 200.0)
-	if not game.ride.is_empty() and game.ride.kind == "nana":
-		want = minf(want, NANA_CAP)
-	want = minf(want, float(lane[1]))
+	if reckless:
+		# Only slow down for the stop itself and for really sharp turns.
+		want = maxf(want, 740.0) if total > 300.0 else want
+		if absf(diff) > 1.3:
+			want = minf(want, 260.0)
+	else:
+		if not game.ride.is_empty() and game.ride.kind == "nana":
+			want = minf(want, NANA_CAP)
+		want = minf(want, float(lane[1]))
 	if stunts and _jump_ahead(game.city):
 		want = 800.0   # flat out: anything slower ends in the canal
 	out.throttle = clampf((want - v) / 90.0, -1.0, 1.0)

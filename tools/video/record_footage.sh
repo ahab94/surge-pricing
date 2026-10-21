@@ -26,6 +26,9 @@ record() {  # name level seconds extra-flags...
 		-- --level="$level" --autopilot --clean --exit-on-end --log-events --timeout="$secs" "$@" \
 		| grep -E "^(EVENT|RESULT)" > "$out/$name.events" || true
 	rm -f override.cfg
+	# Footage recorded with --speed=S runs S game-seconds per video-second.
+	local scale=1; for f in "$@"; do [[ $f == --speed=* ]] && scale=${f#--speed=}; done
+	echo "$scale" > "$out/$name.scale"
 	ffmpeg -loglevel error -y -i "$out/$name.avi" -c:v libx264 -preset fast -crf 16 -pix_fmt yuv420p -an "$out/$name.mp4"
 	rm "$out/$name.avi"
 	local size; size=$(ffprobe -v error -select_streams v -show_entries stream=width,height -of csv=p=0:s=x "$out/$name.mp4")
@@ -42,5 +45,11 @@ for o in l p; do
 	record $o-vip 2 15 --hunt --special=motorcade --special-at=6 --close-cam
 	record $o-amb 1 9 --special=ambulance --watch-special --close-cam
 done
+# Comedy Shorts: talking passengers, game time at 1.3x (smooth, faster pace).
+record l-same-nana 3 32 --reckless --rider=nana --no-fail --endless --speed=1.3 --close-cam
+record l-same-streamer 3 32 --reckless --rider=streamer --no-fail --endless --speed=1.3 --close-cam
+record p-nana-action 5 200 --reckless --rider=nana --speed=1.3 --close-cam --linger=2.5
+record p-hustler 4 44 --rider=hustler --reckless --endless --no-fail --speed=1.3 --close-cam
+record p-streamer 2 90 --rider=streamer --stunts --endless --no-fail --speed=1.3 --close-cam
 record l-surge 5 16
 record l-rain 6 33.5

@@ -17,6 +17,12 @@ A top-down arcade-taxi rideshare game in Godot 4.7 (GDScript). You drive for the
   - `--screenshot=path.png --wait=S` saves a frame after S simulated seconds, then quits.
   - `--special=chase|ambulance|trash|motorcade` starts that event at once, close by. `--watch-special` makes the camera follow it (screenshots, video cutaways). `--stunts` makes the bot route over ramps and the canal. `--hunt` makes it ram the getaway car or the motorcade. `--special-at=S` delays `--special`. `--close-cam` brings the 3D camera about 30% closer (footage).
   - `--clean` hides the shift tip (for footage).
+  - Comedy footage flags:
+    - `--rider=KIND` forces every passenger's type, and the rides still match.
+    - `--reckless` makes the bot drive full speed with no manners.
+    - `--speed=S` sets Engine.time_scale; the recorder writes `.scale` files.
+    - `--no-fail` / `--endless` stop the shift from ending.
+    - `--linger=S` keeps the results card up before quitting.
   - `--touch` shows the touch controls; the mouse can press them.
   - Put `--fixed-fps 60` (a Godot flag, before `--`) to run headless faster than real time.
 - Portrait: `godot --path . --resolution 720x1280 -- ...`. The game switches its base size to 720x1280 when the window is taller than wide.
@@ -42,7 +48,7 @@ A top-down arcade-taxi rideshare game in Godot 4.7 (GDScript). You drive for the
   - Ordinary-car rules:
     - They brake for the player and for cars ahead going their way. Crossing cars yield by index, so no deadlocks.
   - `circles()` (enough circles to cover long trucks), `radius()` and `velocity()` are used for contacts.
-- `scripts/riders.gd`: passenger types (mood and tip tuning, names, reviews per star level, bail lines).
+- `scripts/riders.gd`: passenger types: mood and tip tuning, names, reviews per star level, bail lines, and `says` (speech-bubble lines per moment). game.gd `_say()` shows them in the HUD speech bubble, pinned above the car via `view3d.car_screen_pos()`.
 - `scripts/levels.gd`: shifts as data: goal, clock, rating floor, rider mix, traffic loops, surge, rain, par, seed.
 - `scripts/game.gd`: the shift rules:
   - requests, pickup and drop-off, fare and tip payout, clock bonuses;

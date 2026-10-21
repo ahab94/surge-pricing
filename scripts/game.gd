@@ -75,6 +75,11 @@ var popups: Array = []
 var splashes: Array = []         # {pos, t}: water splashes playing out
 var splash_hold := 0.0           # seconds the car stays sunk before it respawns
 var splash_pos := Vector2.ZERO
+var bubble_text := ""           # what the passenger is shouting right now
+var bubble_t := 0.0
+var _say_cd := 0.0
+var _mutter_t := 0.0
+var say_rng := RandomNumberGenerator.new()
 var cam_scale := 1.0             # 3D camera distance multiplier (--close-cam for videos)
 var clock_time := 0.0
 
@@ -90,6 +95,8 @@ var _flags := {}
 func _ready() -> void:
 	_setup_input()
 	_parse_flags()
+	if _flags.has("speed"):
+		Engine.time_scale = float(_flags.speed)   # footage: faster pace, still every frame drawn
 	if _flags.has("close-cam"):
 		cam_scale = 0.68
 	_load_progress()
@@ -135,6 +142,10 @@ func start_level(i: int) -> void:
 	level = Levels.get_level(level_index)
 	rng.seed = int(level.seed)
 	review_rng.seed = int(level.seed) * 7 + 1
+	say_rng.seed = int(level.seed) * 13 + 5
+	bubble_text = ""
+	bubble_t = 0.0
+	_say_cd = 0.0
 
 	world = Node2D.new()
 	world.name = "World"
@@ -186,6 +197,7 @@ func start_level(i: int) -> void:
 	if bot:
 		bot.stunts = _flags.has("stunts")
 		bot.hunt = _flags.has("hunt")
+		bot.reckless = _flags.has("reckless")
 	state = State.DRIVING
 
 	var s: Vector2 = city.size_px()
@@ -255,6 +267,8 @@ func _spawn_request() -> void:
 			dests.append(d)
 	var dest: String = dests[rng.randi() % dests.size()]
 	var kind := _pick_kind()
+	if _flags.has("rider"):
+		kind = String(_flags.rider)   # footage: everyone is Nana (the rng is still consumed, so rides match)
 	var info: Dictionary = Riders.KINDS[kind]
 	var tiles: int = city.route(city.stops[letter], city.stops[dest]).size()
 	waiting.append({
@@ -341,6 +355,8 @@ func _physics_process(delta: float) -> void:
 	if _route_timer <= 0.0:
 		_route_timer = 0.2
 		_update_route()
+	_say_cd -= delta
+	bubble_t = maxf(0.0, bubble_t - delta)
 	for p in popups:
 		p.t -= delta
 	popups = popups.filter(func(p) -> bool: return p.t > 0.0)
@@ -421,6 +437,7 @@ func _hit_special(npc: Dictionary) -> void:
 				traffic.bust(npc)
 				money += 15.0
 				_popup("CITIZEN'S ARREST! +$15", Color("57e36b"), 42)
+				_say("arrest", true)
 				if not ride.is_empty():
 					ride.mood += 20.0 if streamer else 5.0
 		"police":
@@ -429,6 +446,7 @@ func _hit_special(npc: Dictionary) -> void:
 			_fine(10.0, "You hit an AMBULANCE?!")
 		"suv", "bike":
 			_fine(25.0, "DIPLOMATIC INCIDENT!")
+			_say("incident", true)
 			if not ride.is_empty():
 				ride.mood += 25.0 if streamer else -30.0
 		"trash":
@@ -501,6 +519,7 @@ func _on_event(e: Dictionary) -> void:
 	match e.type:
 		"crash":
 			crashes += 1
+			_say("crash", float(e.impact) > 300.0)   # a big hit interrupts
 			if riding:
 				ride.mood += float(kind.crash)
 				if float(kind.crash) > 0.0:
@@ -510,17 +529,21 @@ func _on_event(e: Dictionary) -> void:
 			else:
 				_popup("BONK", Color("ff4d6d"), 30)
 		"near_miss":
+			_say("near")
 			var label: String = SPECIAL_CLOSE.get(e.get("kind", "car"), "CLOSE CALL!")
 			var big: bool = e.get("kind", "car") != "car"
 			_stunt(2.5 if big else 1.0, label, 2.0 if big else 1.0)
 		"land":
+			_say("jump", true)
 			var air: float = e.air
 			_stunt(2.0 + air * 4.0, "BIG AIR! %.1fs" % air, 2.0)
 		"drift":
+			_say("drift")
 			var secs: float = e.secs
 			_stunt(secs * 1.5, "DRIFT %.1fs" % secs, secs)
 		"splash":
 			crashes += 1
+			_say("splash", true)
 			if riding:
 				ride.mood += 12.0 if ride.kind == "streamer" else -30.0
 			splash_pos = e.at
@@ -529,6 +552,25 @@ func _on_event(e: Dictionary) -> void:
 			_popup("SPLASH!", Color("37b7ff"), 46)
 		"takeoff":
 			pass
+
+
+## The passenger shouts something in a speech bubble. `force` interrupts a
+## bubble that's still up (big moments); otherwise there's a short cooldown so
+## they don't talk over themselves.
+func _say(moment: String, force := false) -> void:
+	if ride.is_empty() or (_say_cd > 0.0 and not force):
+		return
+	var line: String = Riders.say(ride.kind, moment, say_rng)
+	for k in 3:   # don't say the same thing twice in a row
+		if line != bubble_text:
+			break
+		line = Riders.say(ride.kind, moment, say_rng)
+	if line == "":
+		return
+	bubble_text = line
+	bubble_t = 2.0
+	_say_cd = 1.4
+	_log_event({"type": "say", "kind": ride.kind, "text": line})
 
 
 ## A stunt: tips (if they like it), and mood up or down by the passenger's taste.
@@ -571,6 +613,15 @@ func _update_ride(delta: float) -> void:
 	elif v < Riders.CRAWL and car.position.distance_to(city.center(ride.dest_tile)) > DROP_RADIUS * 1.5:
 		ride.mood += float(kind.slow) * delta
 	ride.mood = clampf(ride.mood, 0.0, 100.0)
+	# Grumbling about the driving, every few seconds while it lasts.
+	_mutter_t += delta
+	if _mutter_t > 3.5:
+		if v > Riders.SPEEDY and float(kind.fast) < 0.0 or v > Riders.SPEEDY and ride.kind == "hustler":
+			_mutter_t = 0.0
+			_say("fast")
+		elif v < Riders.CRAWL and float(kind.slow) < -1.0 and elapsed > 1.0:
+			_mutter_t = 0.0
+			_say("slow")
 	ride.time_left -= delta
 	if ride.time_left <= 0.0:
 		_bail()
@@ -598,6 +649,8 @@ func _pick_up(w: Dictionary) -> void:
 		ride.fare *= 2.0
 	_popup("%s hopped in!" % w.name, Color("fff8e7"), 30)
 	_log_event({"type": "pickup", "kind": w.kind})
+	_say("pickup", true)
+	_mutter_t = 0.0
 	_spawn_request()
 	_update_route()
 
@@ -625,7 +678,7 @@ func _drop_off() -> void:
 	var quote: String = Riders.review(ride.kind, stars, review_rng)
 	hud.toast(ride.name, stars, quote, "+$%.2f" % pay)
 	_popup("%s +%ds" % [speed_word, int(bonus)], Color("ffd23f"), 40)
-	_log_event({"type": "dropoff", "kind": ride.kind, "stars": stars, "pay": pay})
+	_log_event({"type": "dropoff", "kind": ride.kind, "stars": stars, "pay": pay, "name": ride.name, "quote": quote})
 	ride = {}
 	_update_route()
 
@@ -633,9 +686,10 @@ func _drop_off() -> void:
 func _bail() -> void:
 	reviews.append(1)
 	bails += 1
-	hud.toast(ride.name, 1, Riders.bail_line(ride.kind, review_rng), "$0")
+	var line: String = Riders.bail_line(ride.kind, review_rng)
+	hud.toast(ride.name, 1, line, "$0")
 	_popup("They bailed!", Color("ff4d6d"), 40)
-	_log_event({"type": "bail", "kind": ride.kind})
+	_log_event({"type": "bail", "kind": ride.kind, "name": ride.name, "quote": line})
 	ride = {}
 	_spawn_request()
 	_update_route()
@@ -661,6 +715,8 @@ func _update_surge(delta: float) -> void:
 func _check_end() -> void:
 	if money >= float(level.goal) and not _flags.has("endless"):   # --endless: footage keeps rolling
 		_win()
+	elif _flags.has("no-fail"):
+		pass   # footage: keep rolling whatever happens
 	elif rating() < float(level.floor):
 		_lose("DEACTIVATED!", "Your rating fell below %.1f. The app has 'concerns'." % float(level.floor))
 	elif clock <= 0.0:
@@ -739,6 +795,11 @@ func _update_route() -> void:
 func _process(delta: float) -> void:
 	if view:
 		view.sync(self, delta)
+		# The speech bubble is HUD (always crisp), pinned above the car on screen.
+		if bubble_t > 0.0 and car != null and state == State.DRIVING or bubble_t > 0.0 and state != State.MENU:
+			hud.set_bubble(bubble_text, view.car_screen_pos(), clampf(bubble_t / 0.3, 0.0, 1.0))
+		else:
+			hud.set_bubble("", Vector2.ZERO, 0.0)
 	if car != null:
 		var ahead: Vector2 = car.vel * 0.35
 		camera.position = car.position + ahead.limit_length(220.0)
@@ -842,6 +903,9 @@ func _log_event(e: Dictionary) -> void:
 func _report(outcome: String) -> void:
 	if not _flags.has("exit-on-end"):
 		return
+	if _flags.has("linger") and outcome != "timeout":
+		# Footage: leave the results card on screen for a moment first.
+		await get_tree().create_timer(float(_flags.linger), true, false, true).timeout
 	print("RESULT level=%d %s money=%.2f goal=%d rating=%.2f rides=%d bails=%d crashes=%d time=%.1f stars=%d reason=%s" % [
 		level_index, outcome, money, int(level.get("goal", 0)), rating() if not reviews.is_empty() else 0.0,
 		rides_done, bails, crashes, elapsed, result_stars, fail_reason.replace(" ", "_")])
