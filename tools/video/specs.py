@@ -93,4 +93,32 @@ VIDEOS = [
               (1, 75.9, 76.9, "cap", "...", "big"),
           ],
           outro=3.0),
+
+    # Special traffic: a citizen's arrest, the ambulance, the motorcade.
+    # Same cut in both formats (the portrait and landscape runs are identical).
+    *[video(vid, orient,
+            segments=[
+                (f"{o}-chase", 12.6, 17.8, 1.0),   # catch the getaway car... and bump a cop
+                (f"{o}-amb", 2.5, 8.0, 1.3),       # everyone pulls over
+                (f"{o}-vip", 9.6, 14.2, 1.0),      # four diplomatic incidents in half a second
+            ],
+            cues=[
+                (0, 12.6, 15.6, "cap", "In my rideshare game\nyou can make a\nCITIZEN'S ARREST", "hook"),
+                (0, 12.6, None, "sfx", "siren", 0.5),
+                (0, 15.9, None, "sfx", "bonk", 0.8),
+                (0, 16.0, None, "sfx", "kaching", 0.9),
+                (0, 16.3, 17.8, "cap", "...and a fine for\nbumping the cop.", "low"),
+                (1, 2.5, 8.0, "cap", "Ambulance?\nEveryone pulls over.", "hook"),
+                (1, 2.6, None, "sfx", "siren", 0.6),
+                (2, 9.6, 12.0, "cap", "Rule #1: don't touch\nthe motorcade.", "hook"),
+                (2, 12.13, None, "sfx", "bonk", 0.8),
+                (2, 12.18, None, "sfx", "bonk", 0.8),
+                (2, 12.38, None, "sfx", "bonk", 0.8),
+                (2, 12.52, None, "sfx", "bonk", 0.8),
+                (2, 12.6, 14.2, "cap", "-$100", "punch"),
+                (2, 12.9, None, "sfx", "sad_trombone", 0.7),
+            ],
+            outro=3.0)
+      for vid, orient, o in [("short-citizens-arrest", "portrait", "p"),
+                             ("special-traffic", "landscape", "l")]],
 ]

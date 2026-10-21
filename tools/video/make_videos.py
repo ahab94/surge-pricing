@@ -64,6 +64,9 @@ def caption_png(path, text, style, orient):
     if style == "big":       # punchline, mid-screen above the car
         size = fit(d, lines, 140 if portrait else 120, W)
         centered(d, lines, H * (0.36 if portrait else 0.30), size, SUN, W, stroke=14)
+    elif style == "punch":   # big, but below the car, clear of the game's own popups
+        size = fit(d, lines, 170 if portrait else 140, W)
+        centered(d, lines, H * (0.66 if portrait else 0.72), size, (255, 77, 109), W, stroke=14)
     elif style == "hook":    # white box at the top (portrait: below the HUD clock)
         size = fit(d, lines, 74 if portrait else 70, W, 160)
         f = font(size)

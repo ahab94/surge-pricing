@@ -670,13 +670,14 @@ func sync(game, delta: float) -> void:
 func _follow_camera(game, delta: float) -> void:
 	var car = game.car
 	var ahead: Vector2 = (car.vel * 0.35).limit_length(220.0)
-	# Clamp so the camera doesn't stare at the harbour past the map's edges.
 	var lim: Vector2 = game.city.size_px()
 	var focus: Vector2 = (car.position + ahead) if game.splash_hold <= 0.0 else game.splash_pos
 	if game.watch_special():
 		var lead: Dictionary = game.watch_special()
 		focus = lead.pos + lead.dir * 60.0
-	focus = focus.clamp(Vector2(6 * 128, 4 * 128), lim - Vector2(6 * 128, 3 * 128))
+	# Only a small margin: past the edge is the harbour, which is fine to see,
+	# and a bigger clamp pushes the car off-screen on the edge roads.
+	focus = focus.clamp(Vector2(1.5, 1.5) * 128.0, lim - Vector2(1.5, 1.5) * 128.0)
 	var want := p3(focus)
 	_cam_target = _cam_target.lerp(want, clampf(delta * 6.0, 0.0, 1.0))
 	var rush := clampf(car.speed() / 720.0, 0.0, 1.0)
@@ -684,7 +685,7 @@ func _follow_camera(game, delta: float) -> void:
 	var portrait := vp.y > vp.x
 	camera.keep_aspect = Camera3D.KEEP_WIDTH if portrait else Camera3D.KEEP_HEIGHT
 	camera.fov = 58.0 if portrait else 42.0
-	var dist := 30.0 + 8.0 * rush
+	var dist: float = (30.0 + 8.0 * rush) * game.cam_scale
 	camera.position = _cam_target + Vector3(0, sin(PITCH), cos(PITCH)) * dist
 	camera.look_at(_cam_target, Vector3.UP)
 

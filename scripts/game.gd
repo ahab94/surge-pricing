@@ -75,6 +75,7 @@ var popups: Array = []
 var splashes: Array = []         # {pos, t}: water splashes playing out
 var splash_hold := 0.0           # seconds the car stays sunk before it respawns
 var splash_pos := Vector2.ZERO
+var cam_scale := 1.0             # 3D camera distance multiplier (--close-cam for videos)
 var clock_time := 0.0
 
 var _route_timer := 0.0
@@ -89,6 +90,8 @@ var _flags := {}
 func _ready() -> void:
 	_setup_input()
 	_parse_flags()
+	if _flags.has("close-cam"):
+		cam_scale = 0.68
 	_load_progress()
 
 	# The game simulates in 2D; view3d.gd draws it in 3D. --flat keeps the
@@ -182,6 +185,7 @@ func start_level(i: int) -> void:
 	bot = Autopilot.new() if _flags.has("autopilot") else null
 	if bot:
 		bot.stunts = _flags.has("stunts")
+		bot.hunt = _flags.has("hunt")
 	state = State.DRIVING
 
 	var s: Vector2 = city.size_px()
@@ -469,7 +473,7 @@ func _fine(amount: float, why: String) -> void:
 ## the shift's list.
 func _update_specials(delta: float) -> void:
 	var list: Array = level.get("specials", [])
-	if _flags.has("special") and _special_index == 0:
+	if _flags.has("special") and _special_index == 0 and _sim_time >= float(_flags.get("special-at", 0.0)):
 		# Dev flag: start this event right away, close by (screenshots, videos).
 		_special_index = 1
 		traffic.spawn_event(String(_flags.special), city, rng, car.position, 450.0)

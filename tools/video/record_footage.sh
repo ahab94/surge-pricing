@@ -38,3 +38,9 @@ record l-stunt 2 100 --stunts
 record l-surge 5 60
 record l-rain 6 45
 record p-stunt 2 100 --stunts
+# Special traffic: --hunt rams the getaway car / motorcade; --watch-special follows the convoy.
+for o in l p; do
+	record $o-chase 2 26 --hunt --special=chase --special-at=8 --close-cam
+	record $o-vip 2 20 --hunt --special=motorcade --special-at=6 --close-cam
+	record $o-amb 1 14 --special=ambulance --watch-special --close-cam
+done

@@ -20,6 +20,7 @@ const OVERTAKE := 32.0
 const PULL_RIGHT := 44.0
 
 var stunts := false            # show-off routing over ramps (for videos)
+var hunt := false              # chase down and ram the getaway car / motorcade (for videos)
 var _target := Vector2i(-1, -1)
 var _path: Array = []
 var _repath := 0.0
@@ -32,7 +33,14 @@ func drive(game) -> Dictionary:
 	var car = game.car
 	var city = game.city
 	var dt := 1.0 / 60.0
+	var prey: Dictionary = _prey(game) if hunt else {}
 	var target := _choose(game)
+	if not prey.is_empty():
+		# Head for a spot ahead of it on its route, to cut it off.
+		var lead: float = minf(car.position.distance_to(prey.pos) * 0.5, 420.0)
+		target = city.tile_of(prey.pos + prey.dir * lead)
+		if not city.is_road(target):
+			target = city.tile_of(prey.pos)
 	_repath -= dt
 	var here: Vector2i = city.tile_of(car.position)
 	if target != _target or _repath <= 0.0 or _path.is_empty():
@@ -65,8 +73,14 @@ func drive(game) -> Dictionary:
 	var lane: Array = _traffic(game, absf(v))
 	var to_aim: Vector2 = (aim - car.position).normalized()
 	aim += Vector2(-to_aim.y, to_aim.x) * float(lane[0])
+	var ramming: bool = not prey.is_empty() and car.position.distance_to(prey.pos) < 280.0
+	if ramming:
+		aim = prey.pos + prey.dir * prey.speed * 0.25   # lead the target a little
 	var diff := wrapf((aim - car.position).angle() - car.heading, -PI, PI)
 	out.steer = clampf(diff * 2.5, -1.0, 1.0)
+	if ramming and absf(diff) < 1.2:
+		out.throttle = 1.0
+		return out
 
 	# Three-point turn: if the route is behind us, or we've been nosed into a
 	# wall, back up steering the "wrong" way, which swings the nose round.
@@ -118,6 +132,15 @@ func drive(game) -> Dictionary:
 
 
 ## A ramp with water right after it within the next few tiles of the route.
+## The special vehicle worth ramming on camera: the getaway car (citizen's
+## arrest) or a motorcade SUV (diplomatic incident).
+func _prey(game) -> Dictionary:
+	for npc in game.traffic.cars:
+		if (npc.kind == "getaway" and npc.busted < 0.0) or (npc.kind == "suv" and npc.hit_cd <= 0.0):
+			return npc
+	return {}
+
+
 func _jump_ahead(city) -> bool:
 	for i in range(0, mini(_path.size() - 1, 6)):
 		if city.cell(_path[i]) == "^" and city.cell(_path[i + 1]) == "~":

@@ -15,7 +15,7 @@ A top-down arcade-taxi rideshare game in Godot 4.7 (GDScript). You drive for the
   - `--exit-on-end` prints `RESULT level=… complete|failed|timeout money=… goal=… rating=… rides=… bails=… crashes=… time=… stars=… reason=…`, then quits.
   - `--timeout=S` counts simulated seconds.
   - `--screenshot=path.png --wait=S` saves a frame after S simulated seconds, then quits.
-  - `--special=chase|ambulance|trash|motorcade` starts that event at once, close by. `--watch-special` makes the camera follow it (screenshots, video cutaways). `--stunts` makes the bot route over ramps and the canal.
+  - `--special=chase|ambulance|trash|motorcade` starts that event at once, close by. `--watch-special` makes the camera follow it (screenshots, video cutaways). `--stunts` makes the bot route over ramps and the canal. `--hunt` makes it ram the getaway car or the motorcade. `--special-at=S` delays `--special`. `--close-cam` brings the 3D camera about 30% closer (footage).
   - `--clean` hides the shift tip (for footage).
   - `--touch` shows the touch controls; the mouse can press them.
   - Put `--fixed-fps 60` (a Godot flag, before `--`) to run headless faster than real time.

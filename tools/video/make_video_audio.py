@@ -113,6 +113,12 @@ def sfx():
     s["splash"] = layer(noise(0.7, 0.6, decay=0.22, lowpass=3000, sweep_to=400, seed=12),
                         at(0.15, tone(500, 0.12, "sine", 0.3, glide_to=1200, decay=0.04)),
                         at(0.3, tone(400, 0.12, "sine", 0.25, glide_to=1000, decay=0.04)))
+    # A two-tone emergency siren: wee-woo, wee-woo.
+    parts = []
+    for k in range(4):
+        parts.append(at(k * 0.42, tone(hz("B5") if k % 2 == 0 else hz("E5"), 0.42, "tri", 0.3, attack=0.02,
+                                       release=0.05, lowpass=2500)))
+    s["siren"] = layer(*parts)
     s["slide_up"] = vibrato(500, 0.55, 0.5, 0.012, 7, glide_to=1900)
     s["boing"] = vibrato(180, 0.6, 0.6, 0.35, 11, shape="tri", glide_to=320, decay=0.25)
     notes = [("D4", 0.32), ("C#4", 0.32), ("C4", 0.32), ("B3", 1.1)]
