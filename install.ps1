@@ -20,6 +20,15 @@ if (-not $asset) { throw "No Windows build in the latest release. See https://gi
 $zip = Join-Path $env:TEMP $asset.name
 Write-Host "Downloading $($asset.name)..."
 Invoke-WebRequest $asset.browser_download_url -OutFile $zip -UseBasicParsing
+# Verify the download against the release's published SHA-256 sums; refuse to
+# install anything that doesn't match (corrupted or tampered download).
+$sums = $release.assets | Where-Object { $_.name -eq 'SHA256SUMS' } | Select-Object -First 1
+if (-not $sums) { Remove-Item $zip; throw 'This release has no SHA256SUMS; not installing.' }
+$lines = (Invoke-WebRequest $sums.browser_download_url -UseBasicParsing).Content -split "`n"
+$want = ($lines | Where-Object { $_ -match ("\s" + [regex]::Escape($asset.name) + "$") } | Select-Object -First 1) -replace '\s.*$', ''
+$got = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+if (-not $want -or $want.Trim().ToLower() -ne $got) { Remove-Item $zip; throw "Checksum mismatch for $($asset.name); not installing." }
+Write-Host 'Checksum OK.'
 if (Test-Path $dest) { Remove-Item $dest -Recurse -Force }
 Expand-Archive $zip -DestinationPath $dest -Force
 Remove-Item $zip

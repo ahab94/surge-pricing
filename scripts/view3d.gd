@@ -62,6 +62,9 @@ func _ready() -> void:
 	sun.light_energy = 0.8
 	sun.shadow_enabled = true
 	sun.directional_shadow_max_distance = 80.0
+	if OS.has_feature("web"):
+		# Browsers (often laptop GPUs or phones): a smaller shadow map is much cheaper.
+		RenderingServer.directional_shadow_atlas_set_size(2048, true)
 	add_child(sun)
 
 	env = Environment.new()

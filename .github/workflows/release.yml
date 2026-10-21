@@ -104,6 +104,8 @@ jobs:
         with:
           name: builds
           path: dist
+      - name: Checksums (the installers verify downloads against these)
+        run: (cd dist && sha256sum *.zip > SHA256SUMS && cat SHA256SUMS)
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -111,9 +113,9 @@ jobs:
           notes="docs/releases/${GITHUB_REF_NAME}.md"
           [ -f "$notes" ] || notes=/dev/null
           if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" dist/*.zip --clobber
+            gh release upload "$GITHUB_REF_NAME" dist/*.zip dist/SHA256SUMS --clobber
           else
-            gh release create "$GITHUB_REF_NAME" dist/*.zip \
+            gh release create "$GITHUB_REF_NAME" dist/*.zip dist/SHA256SUMS \
               --title "Surge Pricing ${GITHUB_REF_NAME}" --notes-file "$notes"
           fi
 

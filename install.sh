@@ -52,6 +52,13 @@ tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 echo "Downloading ${url##*/}..."
 curl -fL --progress-bar -o "$tmp/game.zip" "$url"
+# Verify the download against the release's published SHA-256 sums; refuse to
+# install anything that doesn't match (corrupted or tampered download).
+curl -fsSL -o "$tmp/SHA256SUMS" "${url%/*}/SHA256SUMS" || { echo "Couldn't fetch SHA256SUMS for this release; not installing."; exit 1; }
+want=$(grep " ${url##*/}\$" "$tmp/SHA256SUMS" | cut -d' ' -f1)
+if command -v sha256sum >/dev/null; then got=$(sha256sum "$tmp/game.zip" | cut -d' ' -f1); else got=$(shasum -a 256 "$tmp/game.zip" | cut -d' ' -f1); fi
+[ -n "$want" ] && [ "$want" = "$got" ] || { echo "Checksum mismatch for ${url##*/}; not installing."; exit 1; }
+echo "Checksum OK."
 unzip -q "$tmp/game.zip" -d "$tmp/game"
 
 if [ "$platform" = macos ]; then
