@@ -127,5 +127,42 @@ func _live(game) -> void:
 		await physics_frame
 	check(npc.speed < 20.0, "traffic stops for the player in its lane")
 
+	# Special traffic: cars pull over for sirens; ramming the getaway car is
+	# a citizen's arrest; touching the motorcade is a fine.
+	game.start_level(1)
+	await physics_frame
+	var tr = game.traffic
+	var ordinary: Dictionary = tr.cars[0]
+	tr.spawn_event("ambulance", game.city, game.rng, game.car.position)
+	var amb: Dictionary = tr.cars.back()
+	check(amb.siren and amb.special, "the ambulance is a siren special")
+	amb.s = ordinary.s - 150.0
+	amb.path = ordinary.path
+	amb.total = ordinary.total
+	for i in 40:
+		await physics_frame
+	check(ordinary.shift > 15.0, "ordinary cars pull over for a siren (shift %.0f)" % ordinary.shift)
+	tr.cars = tr.cars.filter(func(c) -> bool: return not c.special)
+
+	tr.spawn_event("chase", game.city, game.rng, game.car.position)
+	var getaway: Dictionary = tr.cars.filter(func(c) -> bool: return c.kind == "getaway")[0]
+	var before: float = game.money
+	game.car.position = getaway.pos + getaway.dir * 30.0
+	game.car.vel = -getaway.dir * 300.0
+	await physics_frame
+	await physics_frame
+	check(getaway.busted >= 0.0, "ramming the getaway car busts the chase")
+	check(game.money >= before + 15.0, "a citizen's arrest pays")
+	tr.cars = tr.cars.filter(func(c) -> bool: return not c.special)
+
+	tr.spawn_event("motorcade", game.city, game.rng, game.car.position)
+	var suv: Dictionary = tr.cars.filter(func(c) -> bool: return c.kind == "suv")[0]
+	game.money = 50.0
+	game.car.position = suv.pos + Vector2(-suv.dir.y, suv.dir.x) * 20.0
+	game.car.vel = Vector2.ZERO
+	await physics_frame
+	await physics_frame
+	check(game.money <= 25.0, "touching the motorcade is a diplomatic incident (money %.0f)" % game.money)
+
 	print("GAME OK" if failures == 0 else "GAME FAILED (%d)" % failures)
 	quit(0)

@@ -17,6 +17,7 @@ const DECEL := 800.0           # braking it plans with, a bit under the car's re
 const NANA_CAP := 430.0        # stays under Riders.SPEEDY with Nana aboard
 const KEEP_RIGHT := 14.0
 const OVERTAKE := 32.0
+const PULL_RIGHT := 44.0
 
 var stunts := false            # show-off routing over ramps (for videos)
 var _target := Vector2i(-1, -1)
@@ -156,6 +157,10 @@ func _traffic(game, v: float) -> Array:
 	var car = game.car
 	var f: Vector2 = car.forward()
 	var right := Vector2(-f.y, f.x)
+	# Sirens nearby: hug the kerb so they pass down the middle (and no fines).
+	for npc in game.traffic.cars:
+		if npc.siren and npc.pos.distance_to(car.position) < 380.0:
+			return [PULL_RIGHT, INF]
 	var block := INF
 	for npc in game.traffic.cars:
 		if npc.dir.dot(f) < 0.3:

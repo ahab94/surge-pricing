@@ -42,6 +42,20 @@ Made with Godot 4.7, everything built in code: an angled 3D city over a 2D arcad
 | Nana | a smooth, gentle ride | speed, bumps, stunts | 1.6× fare, never tips for stunts, $5 + a butterscotch for 5 stars |
 | Hustle Bro | speed | waiting | 2× fare, tight timer |
 
+### Special traffic
+
+Every so often the app flashes an alert and something special hits the streets:
+
+- **Police chase.** A getaway car and two cruisers tear around the ring road. Ram the
+  getaway car for a **Citizen's Arrest (+$15)**. Bump a cruiser and you're fined.
+- **Ambulance.** Sirens on, straight down the middle, and traffic pulls over. Block it
+  and you're fined ("MOVE IT!"). Tail it through the gap for **Ambulance Chaser** tips.
+- **Garbage truck.** Long, slow, stops to collect. Overtake it. Bumping it: "EWW!"
+- **VIP motorcade.** Escort bikes and black SUVs with flags. Touch it and it's a
+  **Diplomatic Incident (−$25)**. Livestreamers love that.
+
+Close calls with any of them tip extra.
+
 ### Shifts (v0.1)
 
 Each shift adds one thing.

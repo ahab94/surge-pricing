@@ -28,6 +28,10 @@ const NEAR_MISS := 78.0          # px between centres that counts as a close cal
 const NEAR_MISS_SPEED := 280.0
 const SURGE_MOVE := 20.0         # seconds between surge zone moves
 const SURGE_RADIUS := 440.0
+const SPECIAL_CLOSE := {
+	"getaway": "WHOA, A CAR CHASE!", "police": "CLOSE CALL: COPS!", "ambulance": "CLOSE CALL: AMBULANCE!",
+	"trash": "SQUEEZED PAST THE TRASH!", "suv": "BUZZED THE VIP!", "bike": "BUZZED THE VIP!",
+}
 const VIEW := 760.0              # world px across the short side of the screen
 
 enum State { MENU, DRIVING, WON, FAILED }
@@ -74,6 +78,9 @@ var splash_pos := Vector2.ZERO
 var clock_time := 0.0
 
 var _route_timer := 0.0
+var _special_timer := 0.0
+var _special_index := 0
+var _chaser_t := 0.0
 var _surge_timer := 0.0
 var _sim_time := 0.0
 var _flags := {}
@@ -164,6 +171,9 @@ func start_level(i: int) -> void:
 	fail_reason = ""
 	result_stars = 0
 	_surge_timer = 0.0
+	_special_timer = 0.0
+	_special_index = 0
+	_chaser_t = 0.0
 	_route_timer = 0.0
 	if level.surge:
 		_move_surge()
@@ -317,6 +327,7 @@ func _physics_process(delta: float) -> void:
 		for e in car.events:
 			_on_event(e)
 		_update_surge(delta)
+		_update_specials(delta)
 		_update_ride(delta)
 		_check_stops()
 		_check_end()
@@ -328,9 +339,13 @@ func _physics_process(delta: float) -> void:
 		p.t -= delta
 	popups = popups.filter(func(p) -> bool: return p.t > 0.0)
 	if _flags.has("trace") and fmod(_sim_time, 0.5) < delta:
-		print("TRACE t=%.1f pos=(%.0f,%.0f) v=%.0f thr=%.2f steer=%.2f money=%.1f clock=%.1f ride=%s" % [
+		var near_special := INF
+		for npc in traffic.cars:
+			if npc.special:
+				near_special = minf(near_special, car.position.distance_to(npc.pos))
+		print("TRACE t=%.1f pos=(%.0f,%.0f) v=%.0f thr=%.2f steer=%.2f money=%.1f clock=%.1f ride=%s special=%.0f" % [
 			_sim_time, car.position.x, car.position.y, car.speed(), car.throttle, car.steer,
-			money, clock, ride.get("dest", "-")])
+			money, clock, ride.get("dest", "-"), near_special])
 	_update_hud()
 
 
@@ -362,27 +377,115 @@ func _traffic_contacts() -> void:
 		return
 	for npc in traffic.cars:
 		var touching := false
+		var reach: float = Car.RADIUS + traffic.radius(npc)
 		for a in car.circles():
 			for b in traffic.circles(npc):
 				var d: Vector2 = a - b
-				var reach := Car.RADIUS + Traffic.RADIUS
 				if d.length() < reach and d.length() > 0.001:
 					touching = true
 					car.position += d.normalized() * (reach - d.length())
 					car.bounce(d.normalized(), traffic.velocity(npc))
 					npc.honk = 1.2
+		if touching and npc.special and npc.hit_cd <= 0.0:
+			npc.hit_cd = 2.0
+			_hit_special(npc)
+		_special_rules(npc)
 		var dist: float = car.position.distance_to(npc.pos)
+		var near: float = NEAR_MISS + (npc.length - 46.0) * 0.5
 		if touching:
 			npc.touched = true
-		if dist < NEAR_MISS and car.speed() > NEAR_MISS_SPEED:
+		if dist < near and car.speed() > NEAR_MISS_SPEED:
 			npc.close = true
-		elif dist > NEAR_MISS + 20.0 and npc.close:
+		elif dist > near + 20.0 and npc.close:
 			if not npc.touched:
-				_on_event({"type": "near_miss"})
+				_on_event({"type": "near_miss", "kind": npc.kind})
 			npc.close = false
 			npc.touched = false
-		elif dist > NEAR_MISS + 20.0:
+		elif dist > near + 20.0:
 			npc.touched = false
+
+
+## Bumping into a special vehicle has consequences.
+func _hit_special(npc: Dictionary) -> void:
+	var streamer: bool = not ride.is_empty() and ride.kind == "streamer"
+	_log_event({"type": "hit_special", "kind": npc.kind})
+	match npc.kind:
+		"getaway":
+			if npc.busted < 0.0:
+				traffic.bust(npc)
+				money += 15.0
+				_popup("CITIZEN'S ARREST! +$15", Color("57e36b"), 42)
+				if not ride.is_empty():
+					ride.mood += 20.0 if streamer else 5.0
+		"police":
+			_fine(10.0, "Bumped a cop!")
+		"ambulance":
+			_fine(10.0, "You hit an AMBULANCE?!")
+		"suv", "bike":
+			_fine(25.0, "DIPLOMATIC INCIDENT!")
+			if not ride.is_empty():
+				ride.mood += 25.0 if streamer else -30.0
+		"trash":
+			_popup("EWW!", Color("9bd36b"), 40)
+			if not ride.is_empty():
+				ride.mood += 4.0 if streamer else -6.0
+
+
+## Ongoing rules around special vehicles: blocking an ambulance or motorcade
+## costs you, and tailgating an ambulance through traffic pays (it clears the road).
+func _special_rules(npc: Dictionary) -> void:
+	if npc.blocked_t > 1.2:
+		npc.blocked_t = 0.0
+		_fine(5.0, "MOVE IT!" if npc.kind == "ambulance" else "Blocking the motorcade!")
+	if npc.kind == "ambulance":
+		var d: Vector2 = car.position - npc.pos
+		var behind: float = -d.dot(npc.dir)
+		var side: float = absf(d.dot(Vector2(-npc.dir.y, npc.dir.x)))
+		if behind > 40.0 and behind < 220.0 and side < 40.0 and car.speed() > 300.0:
+			_chaser_t += get_physics_process_delta_time()
+			if _chaser_t > 1.5:
+				_chaser_t = 0.0
+				_stunt(1.0, "AMBULANCE CHASER!", 1.0)
+
+
+## Dev flag --watch-special: the camera follows the special convoy's leader
+## instead of your car (screenshots and video cutaways). Empty = follow the car.
+func watch_special() -> Dictionary:
+	if not _flags.has("watch-special") or traffic == null:
+		return {}
+	for npc in traffic.cars:
+		if npc.special:
+			return npc
+	return {}
+
+
+func _fine(amount: float, why: String) -> void:
+	money = maxf(0.0, money - amount)
+	_popup("%s  -$%d" % [why, int(amount)], Color("ff4d6d"), 36)
+	_log_event({"type": "fine", "amount": amount})
+
+
+## Special events: one at a time, a short break after each, cycling through
+## the shift's list.
+func _update_specials(delta: float) -> void:
+	var list: Array = level.get("specials", [])
+	if _flags.has("special") and _special_index == 0:
+		# Dev flag: start this event right away, close by (screenshots, videos).
+		_special_index = 1
+		traffic.spawn_event(String(_flags.special), city, rng, car.position, 450.0)
+		hud.alert(String(Traffic.EVENTS[String(_flags.special)].alert))
+		return
+	if list.is_empty() or traffic.event_active():
+		return
+	_special_timer += delta
+	if _special_timer < (10.0 if _special_index == 0 else 16.0):
+		return
+	_special_timer = 0.0
+	var name: String = list[_special_index % list.size()]
+	_special_index += 1
+	traffic.spawn_event(name, city, rng, car.position)
+	hud.alert(String(Traffic.EVENTS[name].alert))
+	_log_event({"type": "special", "kind": name})
 
 
 func _on_event(e: Dictionary) -> void:
@@ -401,7 +504,9 @@ func _on_event(e: Dictionary) -> void:
 			else:
 				_popup("BONK", Color("ff4d6d"), 30)
 		"near_miss":
-			_stunt(1.0, "CLOSE CALL!", 1.0)
+			var label: String = SPECIAL_CLOSE.get(e.get("kind", "car"), "CLOSE CALL!")
+			var big: bool = e.get("kind", "car") != "car"
+			_stunt(2.5 if big else 1.0, label, 2.0 if big else 1.0)
 		"land":
 			var air: float = e.air
 			_stunt(2.0 + air * 4.0, "BIG AIR! %.1fs" % air, 2.0)

@@ -15,6 +15,8 @@ A top-down arcade-taxi rideshare game in Godot 4.7 (GDScript). You drive for the
   - `--exit-on-end` prints `RESULT level=… complete|failed|timeout money=… goal=… rating=… rides=… bails=… crashes=… time=… stars=… reason=…`, then quits.
   - `--timeout=S` counts simulated seconds.
   - `--screenshot=path.png --wait=S` saves a frame after S simulated seconds, then quits.
+  - `--special=chase|ambulance|trash|motorcade` starts that event at once, close by. `--watch-special` makes the camera follow it (screenshots, video cutaways). `--stunts` makes the bot route over ramps and the canal.
+  - `--clean` hides the shift tip (for footage).
   - `--touch` shows the touch controls; the mouse can press them.
   - Put `--fixed-fps 60` (a Godot flag, before `--`) to run headless faster than real time.
 - Portrait: `godot --path . --resolution 720x1280 -- ...`. The game switches its base size to 720x1280 when the window is taller than wide.
@@ -30,9 +32,16 @@ A top-down arcade-taxi rideshare game in Godot 4.7 (GDScript). You drive for the
   - Two collision circles. `bounce()` is shared by walls and traffic.
   - Ramps launch it for `0.3 + v/1400` s. Landing in water is a splash and a respawn.
   - It emits `events` that game.gd turns into tips and moods.
-- `scripts/traffic.gd`: cars on lane-offset loops.
-  - They brake for the player and for cars ahead going their way. Crossing cars yield by index, so no deadlocks.
-  - `circles()` and `velocity()` are used for contacts.
+- `scripts/traffic.gd`: vehicles on lane-offset loops. KINDS sets each vehicle's size and siren. EVENTS defines the special events:
+  - chase: a getaway car and two police, at 600 px/s. They never stop. Ramming the getaway car busts the chase.
+  - ambulance: slows behind you; `blocked_t` drives the fines.
+  - trash: a long, slow truck that drives 7 s and stops 3 s.
+  - motorcade: bikes and SUVs.
+  - Siren convoys drive the centre line (`shift = -LANE`). Ordinary cars pull over (`shift` toward PULL_OVER) and stop.
+  - `spawn_event` starts a convoy 1100+ px from the player. Vehicles are dicts with a unique `id`; view3d matches nodes by id.
+  - Ordinary-car rules:
+    - They brake for the player and for cars ahead going their way. Crossing cars yield by index, so no deadlocks.
+  - `circles()` (enough circles to cover long trucks), `radius()` and `velocity()` are used for contacts.
 - `scripts/riders.gd`: passenger types (mood and tip tuning, names, reviews per star level, bail lines).
 - `scripts/levels.gd`: shifts as data: goal, clock, rating floor, rider mix, traffic loops, surge, rain, par, seed.
 - `scripts/game.gd`: the shift rules:

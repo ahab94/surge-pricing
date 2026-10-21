@@ -58,6 +58,8 @@ var _drift: TouchScreenButton
 var _stick_index := -1
 var _stick_origin := Vector2.ZERO
 var _tip_time := 0.0
+var _alert: Label
+var _alert_time := 0.0
 
 
 func _ready() -> void:
@@ -100,6 +102,21 @@ func _ready() -> void:
 	pause.pressed.connect(func() -> void: menu_pressed.emit())
 	_driving_ui.add_child(pause)
 
+	_alert = _label(26, Color("ffffff"), false)
+	_alert.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	var pill := StyleBoxFlat.new()
+	pill.bg_color = Color("ff4fa3")
+	pill.set_corner_radius_all(22)
+	pill.set_border_width_all(3)
+	pill.border_color = INK
+	pill.content_margin_left = 22
+	pill.content_margin_right = 22
+	pill.content_margin_top = 6
+	pill.content_margin_bottom = 6
+	_alert.add_theme_stylebox_override("normal", pill)
+	_driving_ui.add_child(_alert)
+	_alert.visible = false
+
 	_build_touch()
 	_build_result_panel()
 	_build_menu()
@@ -108,6 +125,10 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	if _alert_time > 0.0:
+		_alert_time -= delta
+		_alert.visible = _alert_time > 0.0
+		_alert.modulate.a = clampf(_alert_time, 0.0, 1.0) * (0.75 + 0.25 * sin(_alert_time * 12.0))
 	if _tip_time > 0.0:
 		_tip_time -= delta
 		_tip_label.modulate.a = clampf(_tip_time, 0.0, 1.0)
@@ -132,11 +153,21 @@ func show_level(index: int, level: Dictionary) -> void:
 	_rain = level.rain
 	_rain_layer.visible = _rain
 	_toasts.clear()
+	_alert_time = 0.0
+	_alert.visible = false
 	_tip_label.text = "Shift %d: %s\n%s" % [index + 1, level.name, level.tip]
 	_tip_label.modulate.a = 1.0
 	_tip_time = 6.0
 	stick = Vector2.ZERO
 	_stick_index = -1
+
+
+## A flashing app alert under the clock, for special traffic events.
+func alert(text: String) -> void:
+	_alert.text = "YOINK ALERT: " + text
+	_alert_time = 4.0
+	_alert.visible = true
+	_layout()
 
 
 func hide_tip() -> void:
@@ -407,6 +438,8 @@ func _layout() -> void:
 	var s := size
 	var narrow := s.x < 900.0
 	_clock_label.position = Vector2(s.x * 0.5 - _clock_label.size.x * 0.5, 6)
+	_alert.reset_size()
+	_alert.position = Vector2((s.x - _alert.size.x) * 0.5, 250.0 if s.x >= 900.0 else 330.0)
 	_card.position = Vector2(16, 96 if narrow else 16)
 	_tip_label.size = Vector2(minf(s.x - 60.0, 860.0), 0)
 	_tip_label.position = Vector2((s.x - _tip_label.size.x) * 0.5, s.y * (0.62 if narrow else 0.68))

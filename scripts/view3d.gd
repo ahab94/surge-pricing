@@ -35,8 +35,8 @@ var env: Environment
 var _city
 var _city_root: Node3D
 var _car: Node3D
-var _traffic_nodes: Array = []
-var _honks: Array = []
+var _vehicles := {}             # traffic id -> {node, honk, lights}
+var _siren_mats: Array = []     # [red, blue, dark] for flashing light bars
 var _fx_mesh: ImmediateMesh
 var _beams: Array = []          # pooled light beams over requests and the drop-off
 var _people: Array = []
@@ -511,28 +511,10 @@ func on_level(game) -> void:
 	if _car == null:
 		_car = make_car(Color("9be24a"), true)
 		add_child(_car)
-	for n in _traffic_nodes:
-		n.queue_free()
-	for n in _honks:
-		n.queue_free()
-	_traffic_nodes.clear()
-	_honks.clear()
-	for npc in game.traffic.cars:
-		var n := make_car(npc.color, false)
-		add_child(n)
-		_traffic_nodes.append(n)
-		var l := Label3D.new()
-		l.text = "HONK!"
-		l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-		l.no_depth_test = true
-		l.font_size = 56
-		l.outline_size = 14
-		l.pixel_size = 0.01
-		l.modulate = Color("ffd23f")
-		l.outline_modulate = Color("2a2d36")
-		l.visible = false
-		add_child(l)
-		_honks.append(l)
+	for id in _vehicles:
+		_vehicles[id].node.queue_free()
+		_vehicles[id].honk.queue_free()
+	_vehicles.clear()
 	var rain: bool = game.level.rain
 	sun.light_energy = 0.45 if rain else 0.8
 	env.background_color = Color("5d6b80") if rain else Color("8fd0f5")
@@ -542,6 +524,125 @@ func on_level(game) -> void:
 	env.fog_density = 0.012
 	_car.visible = true
 	_cam_target = p3(game.car.position)
+
+
+# ---------------------------------------------------------------- traffic
+
+## Traffic comes and goes (special events), so nodes are matched to vehicles
+## by id every frame: new ids get a model, vanished ids are freed.
+func _sync_traffic(game) -> void:
+	var seen := {}
+	var flash := int(_t * 7.0) % 2 == 0
+	for npc in game.traffic.cars:
+		seen[npc.id] = true
+		if not _vehicles.has(npc.id):
+			_vehicles[npc.id] = _make_vehicle(npc)
+		var v: Dictionary = _vehicles[npc.id]
+		v.node.position = p3(npc.pos)
+		v.node.rotation = Vector3(0, -npc.angle, 0)
+		v.honk.visible = npc.honk > 0.0
+		v.honk.position = p3(npc.pos, 2.2)
+		for i in v.lights.size():
+			var on: bool = flash == (i % 2 == 0)
+			v.lights[i].material_override = _siren_mats[i % 2] if on else _siren_mats[2]
+	for id in _vehicles.keys():
+		if not seen.has(id):
+			_vehicles[id].node.queue_free()
+			_vehicles[id].honk.queue_free()
+			_vehicles.erase(id)
+
+
+func _part(root: Node3D, size: Vector3, pos: Vector3, col: Color) -> MeshInstance3D:
+	var mi := MeshInstance3D.new()
+	var b := BoxMesh.new()
+	b.size = size
+	mi.mesh = b
+	mi.position = pos
+	mi.material_override = _mat(col)
+	root.add_child(mi)
+	return mi
+
+
+func _wheels(root: Node3D, half_len: float, half_w: float) -> void:
+	for wx in [-half_len, half_len]:
+		for wz in [-half_w, half_w]:
+			_part(root, Vector3(0.36, 0.3, 0.12), Vector3(wx, 0.15, wz), Color("1d1f26"))
+
+
+## Models for each kind of vehicle, all facing +X like the player's car.
+func _make_vehicle(npc: Dictionary) -> Dictionary:
+	if _siren_mats.is_empty():
+		for c in [Color("ff2a3a"), Color("2a6bff")]:
+			var m := _unshaded(c, false, false)
+			_siren_mats.append(m)
+		_siren_mats.append(_mat(Color("3a3d48")))
+	var col: Color = npc.color
+	var glass := Color("2c3e5c")
+	var root: Node3D
+	var lights: Array = []
+	match npc.kind:
+		"ambulance":
+			root = Node3D.new()
+			_part(root, Vector3(1.4, 1.0, 0.86), Vector3(-0.22, 0.65, 0), col)
+			_part(root, Vector3(0.5, 0.62, 0.84), Vector3(0.7, 0.46, 0), col)
+			_part(root, Vector3(0.08, 0.3, 0.74), Vector3(0.93, 0.62, 0), glass)
+			_part(root, Vector3(1.42, 0.14, 0.88), Vector3(-0.22, 0.55, 0), Color("e8343f"))
+			_part(root, Vector3(0.36, 0.36, 0.06), Vector3(-0.3, 0.85, 0.44), Color("e8343f"))
+			lights.append(_part(root, Vector3(0.18, 0.14, 0.3), Vector3(0.45, 1.22, -0.2), Color.RED))
+			lights.append(_part(root, Vector3(0.18, 0.14, 0.3), Vector3(0.45, 1.22, 0.2), Color.BLUE))
+			_wheels(root, 0.6, 0.42)
+		"police":
+			root = make_car(col, false)
+			_part(root, Vector3(0.6, 0.3, 0.84), Vector3(0.05, 0.4, 0), Color("f2f2f2"))   # white doors
+			lights.append(_part(root, Vector3(0.16, 0.12, 0.3), Vector3(-0.08, 1.04, -0.18), Color.RED))
+			lights.append(_part(root, Vector3(0.16, 0.12, 0.3), Vector3(-0.08, 1.04, 0.18), Color.BLUE))
+		"getaway":
+			root = make_car(col, false)
+			_part(root, Vector3(0.12, 0.08, 0.84), Vector3(-0.72, 0.78, 0), Color("17181c"))   # spoiler
+			_part(root, Vector3(0.05, 0.2, 0.05), Vector3(-0.72, 0.66, -0.3), Color("17181c"))
+			_part(root, Vector3(0.05, 0.2, 0.05), Vector3(-0.72, 0.66, 0.3), Color("17181c"))
+		"trash":
+			root = Node3D.new()
+			_part(root, Vector3(0.7, 0.85, 0.92), Vector3(0.95, 0.55, 0), col.lightened(0.15))
+			_part(root, Vector3(0.08, 0.34, 0.8), Vector3(1.3, 0.72, 0), glass)
+			_part(root, Vector3(1.85, 1.2, 0.95), Vector3(-0.38, 0.75, 0), col)
+			_part(root, Vector3(1.86, 0.1, 0.96), Vector3(-0.38, 1.0, 0), Color("ffd23f"))
+			_part(root, Vector3(0.12, 0.9, 0.8), Vector3(-1.34, 0.65, 0), col.darkened(0.3))
+			_wheels(root, 0.95, 0.46)
+			_part(root, Vector3(0.36, 0.3, 0.12), Vector3(-0.2, 0.15, -0.46), Color("1d1f26"))
+			_part(root, Vector3(0.36, 0.3, 0.12), Vector3(-0.2, 0.15, 0.46), Color("1d1f26"))
+		"suv":
+			root = Node3D.new()
+			_part(root, Vector3(1.74, 0.55, 0.9), Vector3(0, 0.42, 0), col)
+			_part(root, Vector3(1.1, 0.42, 0.84), Vector3(-0.2, 0.9, 0), Color("0c0d10"))
+			for z in [-0.4, 0.4]:   # little flags on the front wings
+				_part(root, Vector3(0.03, 0.4, 0.03), Vector3(0.75, 0.88, z), Color("c0c0c0"))
+				_part(root, Vector3(0.22, 0.14, 0.02), Vector3(0.65, 1.0, z), Color("ffffff"))
+				_part(root, Vector3(0.22, 0.05, 0.022), Vector3(0.65, 1.03, z), Color("e8343f"))
+			_wheels(root, 0.58, 0.46)
+		"bike":
+			root = Node3D.new()
+			_part(root, Vector3(0.9, 0.3, 0.22), Vector3(0, 0.3, 0), col)
+			_part(root, Vector3(0.3, 0.5, 0.3), Vector3(-0.1, 0.7, 0), Color("1f2a44"))   # rider
+			var helmet := _part(root, Vector3(0.24, 0.24, 0.24), Vector3(-0.08, 1.05, 0), Color("f2f2f2"))
+			helmet.name = "Helmet"
+			lights.append(_part(root, Vector3(0.1, 0.12, 0.1), Vector3(0.38, 0.55, -0.06), Color.BLUE))
+			lights.append(_part(root, Vector3(0.1, 0.12, 0.1), Vector3(0.38, 0.55, 0.06), Color.RED))
+		_:
+			root = make_car(col, false)
+	add_child(root)
+	var l := Label3D.new()
+	l.text = "HONK!"
+	l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	l.no_depth_test = true
+	l.font_size = 56
+	l.outline_size = 14
+	l.pixel_size = 0.01
+	l.modulate = Color("ffd23f")
+	l.outline_modulate = Color("2a2d36")
+	l.visible = false
+	add_child(l)
+	return {"node": root, "honk": l, "lights": lights}
 
 
 # ---------------------------------------------------------------- every frame
@@ -559,12 +660,7 @@ func sync(game, delta: float) -> void:
 	# A little body roll in turns and pitch in the air sells the speed.
 	_car.rotation.x = -car.steer * clampf(car.speed() / 700.0, 0, 1) * 0.12
 	_car.rotation.z = (0.18 * (1.0 - 2.0 * clampf(1.0 - car.air / maxf(car.air_len, 0.01), 0, 1))) if car.air > 0.0 else 0.0
-	for i in _traffic_nodes.size():
-		var npc: Dictionary = game.traffic.cars[i]
-		_traffic_nodes[i].position = p3(npc.pos)
-		_traffic_nodes[i].rotation = Vector3(0, -npc.angle, 0)
-		_honks[i].visible = npc.honk > 0.0
-		_honks[i].position = p3(npc.pos, 2.0)
+	_sync_traffic(game)
 	_draw_fx(game)
 	_place_arrow(game, lift)
 	_place_popups(game)
@@ -577,6 +673,9 @@ func _follow_camera(game, delta: float) -> void:
 	# Clamp so the camera doesn't stare at the harbour past the map's edges.
 	var lim: Vector2 = game.city.size_px()
 	var focus: Vector2 = (car.position + ahead) if game.splash_hold <= 0.0 else game.splash_pos
+	if game.watch_special():
+		var lead: Dictionary = game.watch_special()
+		focus = lead.pos + lead.dir * 60.0
 	focus = focus.clamp(Vector2(6 * 128, 4 * 128), lim - Vector2(6 * 128, 3 * 128))
 	var want := p3(focus)
 	_cam_target = _cam_target.lerp(want, clampf(delta * 6.0, 0.0, 1.0))
