@@ -19,9 +19,9 @@ const Hud := preload("res://scripts/hud.gd")
 const View3D := preload("res://scripts/view3d.gd")
 
 const SAVE_PATH := "user://progress.cfg"
-const PICKUP_RADIUS := 84.0
-const DROP_RADIUS := 100.0
-const STOP_SPEED := 110.0        # px/s: slow enough to board or get out
+const PICKUP_RADIUS := 112.0
+const DROP_RADIUS := 124.0
+const STOP_SPEED := 170.0        # px/s: slow enough to board or get out (a slow roll is fine)
 const RATING_WINDOW := 20        # the rating is the average of the last 20 reviews
 const START_REVIEWS := [5, 5, 5, 5, 4, 5, 5, 4, 5, 5, 5, 5, 5, 5, 5, 5, 4, 5, 5, 4]
 const NEAR_MISS := 78.0          # px between centres that counts as a close call
@@ -200,10 +200,13 @@ func start_level(i: int) -> void:
 	for k in int(level.waiting):
 		_spawn_request()
 	bot = Autopilot.new() if _flags.has("autopilot") else null
+	# Driving aids are for people (and the rookie bot that imitates them).
+	car.assist = (bot == null or _flags.has("rookie")) and not _flags.has("no-assist")
 	if bot:
 		bot.stunts = _flags.has("stunts")
 		bot.hunt = _flags.has("hunt")
 		bot.reckless = _flags.has("reckless")
+		bot.rookie = _flags.has("rookie")
 	state = State.DRIVING
 
 	var s: Vector2 = city.size_px()
@@ -372,9 +375,9 @@ func _physics_process(delta: float) -> void:
 		for npc in traffic.cars:
 			if npc.special:
 				near_special = minf(near_special, car.position.distance_to(npc.pos))
-		print("TRACE t=%.1f pos=(%.0f,%.0f) v=%.0f thr=%.2f steer=%.2f money=%.1f clock=%.1f ride=%s special=%.0f" % [
+		print("TRACE t=%.1f pos=(%.0f,%.0f) v=%.0f thr=%.2f steer=%.2f money=%.1f clock=%.1f ride=%s special=%.0f hd=%.2f wall=%s pin=%.1f" % [
 			_sim_time, car.position.x, car.position.y, car.speed(), car.throttle, car.steer,
-			money, clock, ride.get("dest", "-"), near_special])
+			money, clock, ride.get("dest", "-"), near_special, car.heading, car._wall_n, car._pinned])
 	_update_hud()
 
 
@@ -414,6 +417,7 @@ func _traffic_contacts() -> void:
 					touching = true
 					car.position += d.normalized() * (reach - d.length())
 					car.bounce(d.normalized(), traffic.velocity(npc))
+					car.touching(d.normalized())   # lets the unstick assist free you from a jam
 					npc.honk = 1.2
 		if touching and npc.special and npc.hit_cd <= 0.0:
 			npc.hit_cd = 2.0
@@ -913,9 +917,9 @@ func _report(outcome: String) -> void:
 	if _flags.has("linger") and outcome != "timeout":
 		# Footage: leave the results card on screen for a moment first.
 		await get_tree().create_timer(float(_flags.linger), true, false, true).timeout
-	print("RESULT level=%d %s money=%.2f goal=%d rating=%.2f rides=%d bails=%d crashes=%d time=%.1f stars=%d reason=%s" % [
+	print("RESULT level=%d %s money=%.2f goal=%d rating=%.2f rides=%d bails=%d crashes=%d time=%.1f stars=%d walls=%.1f reason=%s" % [
 		level_index, outcome, money, int(level.get("goal", 0)), rating() if not reviews.is_empty() else 0.0,
-		rides_done, bails, crashes, elapsed, result_stars, fail_reason.replace(" ", "_")])
+		rides_done, bails, crashes, elapsed, result_stars, car.wall_time if car else 0.0, fail_reason.replace(" ", "_")])
 	get_tree().quit()
 
 

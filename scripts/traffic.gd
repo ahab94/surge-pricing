@@ -164,7 +164,10 @@ func event_active() -> bool:
 ## so it drives into view instead of popping up next to you.
 func spawn_event(name: String, city, rng: RandomNumberGenerator, player_pos: Vector2, near := 1100.0) -> void:
 	var ev: Dictionary = EVENTS[name]
-	var loops: Array = ev.loops
+	# The event's preferred loops that this city has (cities have 5-6 loops).
+	var loops: Array = ev.loops.filter(func(l) -> bool: return int(l) < city.loops.size())
+	if loops.is_empty():
+		loops = [0]
 	var lp: Array = _path_for(city, int(loops[rng.randi() % loops.size()]), rng.randf() < 0.5)
 	var total: float = lp[1]
 	var s0 := 0.0
@@ -273,12 +276,19 @@ func update(dt: float, player) -> void:
 		car.honk = maxf(0.0, car.honk - dt)
 		match car.kind if car.special else "car":
 			"car":
-				# Pull over for sirens: slide toward the kerb and stop.
+				# Pull over for sirens: slide toward the kerb and stop. Also make
+				# room when the player has been stuck nose-to-nose with us.
 				var pull := false
 				for sv in sirens:
 					if sv.pos.distance_to(car.pos) < SIREN_RANGE:
 						pull = true
 						break
+				if _player_ahead(car, player, 72.0, 28.0):
+					car.blocked_t += dt
+				else:
+					car.blocked_t = maxf(0.0, car.blocked_t - dt)
+				if car.blocked_t > 1.0:
+					pull = true
 				car.shift = move_toward(car.shift, PULL_OVER * side if pull else 0.0, 60.0 * dt)
 				if pull or _blocked(car, player):
 					target = 0.0

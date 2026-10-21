@@ -81,7 +81,7 @@ func _draw_waiting() -> void:
 	for w in game.waiting:
 		var p: Vector2 = game.city.center(w.tile)
 		var band: Color = [Color("4dbb5f"), Color("ffd23f"), Color("ff4d6d")][w.band]
-		var r := 84.0
+		var r := 112.0
 		draw_circle(p, r, Color(band, 0.18 + 0.1 * _pulse()))
 		draw_arc(p, r, 0, TAU, 48, band, 4.0, true)
 		var kind: Dictionary = Riders.KINDS[w.kind]
@@ -95,7 +95,7 @@ func _draw_destination() -> void:
 	if game.ride.is_empty():
 		return
 	var p: Vector2 = game.city.center(game.ride.dest_tile)
-	var r := 100.0 + 8.0 * _pulse()
+	var r := 124.0 + 8.0 * _pulse()
 	draw_circle(p, r, Color(ROUTE, 0.18))
 	for i in 12:
 		var a: float = game.clock_time * 1.5 + i * TAU / 12.0

@@ -15,13 +15,14 @@ const ACCEL := 700.0
 const BRAKE := 1300.0
 const REVERSE_MAX := 230.0
 const DRAG := 0.25           # fraction of speed lost per second while coasting
-const TURN := 3.1            # rad/s at full lock
+const TURN := 3.6            # rad/s at full lock
 const GRIP := 10.0           # how fast sideways speed dies (per second)
 const DRIFT_GRIP := 1.4
 const RADIUS := 15.0         # two circles, at +-AXLE along the car, collide with walls
 const AXLE := 11.0
 const JUMP_MIN_SPEED := 260.0
-const CRASH_SPEED := 170.0   # impacts harder than this count as a crash
+const CRASH_SPEED := 170.0   # traffic impacts harder than this count as a crash
+const WALL_CRASH_SPEED := 300.0   # walls: only a real head-on hit is a crash
 const LENGTH := 48.0
 const WIDTH := 26.0
 
@@ -36,6 +37,11 @@ var air_len := 0.0
 var drift_time := 0.0
 var last_safe := Vector2.ZERO
 var events: Array = []
+var assist := true           # player driving aids (bots drive raw physics)
+var steer_now := 0.0         # the smoothed steering actually applied
+var _wall_n := Vector2.ZERO  # the wall we're touching (its normal), this tick
+var _pinned := 0.0           # seconds pushing into a wall without moving
+var wall_time := 0.0         # seconds spent touching walls (feel tests)
 var prev_pos := Vector2.ZERO       # last tick's pose, for smooth drawing between ticks
 var prev_heading := 0.0
 var skids: Array = []        # recent rear-wheel positions while sliding (drawn by the game)
@@ -103,11 +109,35 @@ func step(dt: float, city) -> void:
 	if fs > cap:
 		vel -= f * (fs - cap) * minf(1.0, 4.0 * dt)
 
+	# Steering eases in (keys are all-or-nothing; this keeps taps precise).
+	steer_now = move_toward(steer_now, steer, (9.0 if assist else 60.0) * dt)
 	# Steering turns the nose; how fast depends on speed (no spinning on the
-	# spot) and is a bit gentler at top speed so straights feel stable.
+	# spot) and is a touch gentler at top speed so straights feel stable.
 	var roll := clampf(fs / 160.0, -1.0, 1.0)
-	var calm := 1.0 - 0.3 * clampf(absf(fs) / MAX_SPEED, 0.0, 1.0)
-	heading += steer * TURN * roll * calm * (1.35 if drift else 1.0) * dt
+	var calm := 1.0 - 0.1 * clampf(absf(fs) / MAX_SPEED, 0.0, 1.0)
+	heading += steer_now * TURN * roll * calm * (1.35 if drift else 1.0) * dt
+	# Turning hard at speed scrubs speed, so street corners are makeable
+	# without a perfectly timed brake (drifting skips this: that's the point).
+	if assist and not drift and absf(steer_now) > 0.35 and fs > 380.0:
+		vel -= forward() * 520.0 * absf(steer_now) * dt
+	# Wall avoidance: look ahead (further when faster). A wall coming up with
+	# open road to one side (a corner, a bend): ease the steering that way.
+	# Walled in on both sides: brake. A firm steer from the player wins.
+	if assist and fs > 150.0:
+		_avoid_walls(city, fs, dt)
+	# Lane assist: hands off the wheel, the car settles onto the road's axis.
+	if assist and absf(steer) < 0.05 and fs > 120.0 and city.is_road(city.tile_of(position)):
+		var axis := snappedf(heading, PI / 2.0)
+		if absf(wrapf(heading - axis, -PI, PI)) < 0.35:
+			heading = lerp_angle(heading, axis, minf(1.0, 3.0 * dt))
+	# Unstick: pinned against a wall with the gas down, swing the nose free.
+	if assist and _wall_n != Vector2.ZERO and throttle > 0.2 and speed() < 50.0:
+		_pinned += dt
+		if _pinned > 0.4:
+			var away := _wall_n.angle()
+			heading = move_toward(heading, heading + wrapf(away - heading, -PI, PI), 2.6 * dt)
+	else:
+		_pinned = 0.0
 	f = forward()
 
 	# Grip: remove part of the sideways speed. Less grip = slide.
@@ -171,9 +201,58 @@ func _collide(city, airborne: bool) -> void:
 			if push != Vector2.ZERO:
 				position += push
 				normal += push
+	_wall_n = normal.normalized() if normal != Vector2.ZERO else Vector2.ZERO
 	if normal == Vector2.ZERO:
 		return
-	bounce(normal.normalized(), Vector2.ZERO)
+	wall_time += 1.0 / 60.0
+	if assist:
+		_glance(_wall_n)
+	else:
+		bounce(_wall_n, Vector2.ZERO)
+
+
+func _avoid_walls(city, fs: float, dt: float) -> void:
+	var reach := 50.0 + fs * 0.35
+	var ahead: Vector2 = position + forward() * reach
+	# Water doesn't count: it's for jumping (is_solid's "airborne" view ignores it).
+	if not city.is_solid(city.tile_of(ahead), true):
+		return
+	var open_side := 0.0
+	for a in [0.45, 0.9]:
+		var left_ok: bool = not city.is_solid(city.tile_of(position + forward().rotated(-a) * reach), true)
+		var right_ok: bool = not city.is_solid(city.tile_of(position + forward().rotated(a) * reach), true)
+		if left_ok != right_ok:
+			open_side = -1.0 if left_ok else 1.0
+			break
+	if open_side != 0.0 and steer * open_side >= -0.3:
+		steer_now = move_toward(steer_now, open_side, 6.0 * dt)
+	elif open_side == 0.0 and fs > 260.0:
+		vel -= forward() * 700.0 * dt   # dead end ahead: slow down
+
+
+## Something other than a wall is pressing on the car (a traffic car).
+func touching(n: Vector2) -> void:
+	_wall_n = n
+
+
+## Walls (player): lose the speed going into the wall, keep most of the rest,
+## and turn the nose along the wall when it's a glancing hit. Grazing a wall
+## costs a little speed instead of bouncing you backwards.
+func _glance(n: Vector2) -> void:
+	var vn := vel.dot(n)
+	if vn >= 0.0:
+		return
+	vel -= n * vn * 1.15
+	vel *= 0.96
+	var along := Vector2(-n.y, n.x)
+	if along.dot(forward()) < 0.0:
+		along = -along
+	var off := wrapf(along.angle() - heading, -PI, PI)
+	if absf(off) < 0.9:   # glancing: steer the nose along the wall
+		heading += off * 0.35
+	if -vn > WALL_CRASH_SPEED and _crash_cd <= 0.0:
+		_crash_cd = 0.6
+		events.append({"type": "crash", "impact": -vn})
 
 
 ## Shared by walls and traffic: reflect the part of the velocity going into

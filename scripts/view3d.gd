@@ -1034,14 +1034,14 @@ func _draw_fx(game) -> void:
 	for w in game.waiting:
 		var c := p3(game.city.center(w.tile))
 		var band: Color = BANDS[w.band]
-		_disc(im, c + Vector3(0, 0.05, 0), 84.0 / S, Color(band, 0.2 + 0.12 * pulse), 28)
-		_ring(im, c + Vector3(0, 0.06, 0), 84.0 / S, 0.12, band, 28)
+		_disc(im, c + Vector3(0, 0.05, 0), 112.0 / S, Color(band, 0.2 + 0.12 * pulse), 28)
+		_ring(im, c + Vector3(0, 0.06, 0), 112.0 / S, 0.12, band, 28)
 		_beam(im, c, band, 0.45)
 		_person(beam_i, c, Riders.KINDS[w.kind].color, w.surge)
 		beam_i += 1
 	if not game.ride.is_empty():
 		var d := p3(game.city.center(game.ride.dest_tile))
-		var r := 100.0 / S + 0.2 * pulse
+		var r := 124.0 / S + 0.2 * pulse
 		_disc(im, d + Vector3(0, 0.05, 0), r, Color(ROUTE, 0.18), 32)
 		_ring(im, d + Vector3(0, 0.06, 0), r, 0.18, ROUTE, 32)
 		_beam(im, d, ROUTE, 0.6)

@@ -65,7 +65,7 @@ const LEVELS := [
 		"tip": "Drive on the LEFT, and it's raining (of course). Brake early on slick roads.",
 	},
 	{
-		"name": "Tokyo", "city": "tokyo", "specials": ["trash", "ambulance"], "goal": 260, "clock": 65, "floor": 4.1,
+		"name": "Tokyo", "city": "tokyo", "specials": ["trash", "ambulance"], "goal": 230, "clock": 65, "floor": 4.1,
 		"seed": 67, "kinds": {"regular": 2, "hustler": 1, "streamer": 1, "nana": 1},
 		"traffic": [[0, 8, false], [1, 6, true], [2, 4, false], [3, 4, true]], "traffic_speed": 240, "waiting": 4,
 		"surge": true, "rain": false, "par": 125,
@@ -79,7 +79,7 @@ const LEVELS := [
 		"tip": "Police chase across the bridges! Ram the getaway car for a citizen's arrest. Don't bump the cops.",
 	},
 	{
-		"name": "Bangkok", "city": "bangkok", "specials": ["chase", "trash", "ambulance"], "goal": 130, "clock": 70,
+		"name": "Bangkok", "city": "bangkok", "specials": ["chase", "trash", "ambulance"], "goal": 150, "clock": 70,
 		"floor": 4.2, "seed": 79, "kinds": {"regular": 2, "hustler": 1, "streamer": 1, "nana": 1},
 		"traffic_mix": {"tuktuk": 0.4, "scooter": 0.2},
 		"traffic": [[0, 8, false], [1, 4, true], [3, 4, false], [4, 4, true]], "traffic_speed": 210, "waiting": 4,
@@ -88,7 +88,7 @@ const LEVELS := [
 	},
 	{
 		"name": "Singapore", "city": "singapore", "specials": ["chase", "ambulance", "trash", "motorcade"],
-		"goal": 230, "clock": 70, "floor": 4.3, "seed": 83,
+		"goal": 190, "clock": 75, "floor": 4.3, "seed": 83,
 		"kinds": {"regular": 2, "hustler": 1, "streamer": 1, "nana": 1}, "traffic_mix": {"supercar": 0.15},
 		"traffic": [[0, 8, false], [1, 5, true], [2, 4, false], [4, 4, true]], "traffic_speed": 240, "waiting": 4,
 		"surge": true, "rain": false, "night": true, "par": 155,

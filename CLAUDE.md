@@ -38,6 +38,14 @@ A top-down arcade-taxi rideshare game in Godot 4.7 (GDScript). You drive for the
   - Routes come from a cached Dijkstra cost-to-go field per destination (bucket queue). Roads cost 1, grass 4, ramps 30.
   - `push_out` handles collisions: a box per solid tile, round trees, inset houses.
 - `scripts/car.gd`: a kinematic arcade car.
+  - **Driving aids** (`assist`): on for players and the rookie bot, off for the other bots so the gate measures raw physics; `--no-assist` turns them off.
+    - Eased steering.
+    - Speed scrub when turning hard.
+    - Lane assist.
+    - Wall avoidance: look-ahead probes steer toward the open side; water doesn't count.
+    - Glancing wall hits: `_glance`, which slides along the wall. Only a hit over WALL_CRASH_SPEED counts as a crash.
+    - Unstick: pinned against a wall or a traffic car with the gas down, the nose swings free.
+  - `checks/feel.sh`: a rookie bot (on/off keyboard steering, 0.25 s reactions) drives each city for 60 s and reports crashes per minute, seconds on walls and rides. Compare with and without `--no-assist`. On 2026-10-21 the aids took it from 122 to 61 crashes in 10 minutes.
   - Throttle and brake act along the nose. Grip bleeds off sideways speed; DRIFT_GRIP is the handbrake.
   - Two collision circles. `bounce()` is shared by walls and traffic.
   - Ramps launch it for `0.3 + v/1400` s. Landing in water is a splash and a respawn.

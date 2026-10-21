@@ -21,6 +21,11 @@ const PULL_RIGHT := 44.0
 
 var stunts := false            # show-off routing over ramps (for videos)
 var reckless := false          # full speed everywhere, no manners (for funny footage)
+var rookie := false             # drive like a new player on a keyboard (feel tests)
+var _rk_steer := 0.0
+var _rk_think := 0.0
+var _rk_uturn := 0.0
+var _rk_stuck := 0.0
 var hunt := false              # chase down and ram the getaway car / motorcade (for videos)
 var _target := Vector2i(-1, -1)
 var _path: Array = []
@@ -31,6 +36,8 @@ var _rev_steer := 1.0
 
 
 func drive(game) -> Dictionary:
+	if rookie:
+		return _drive_rookie(game)
 	var car = game.car
 	var city = game.city
 	var dt := 1.0 / 60.0
@@ -146,6 +153,70 @@ func drive(game) -> Dictionary:
 
 
 ## A ramp with water right after it within the next few tiles of the route.
+## A new player on a keyboard: steering is all-or-nothing, decided only every
+## quarter second (reaction time); the gas stays down unless the turn is
+## sharp, and they brake only when pointing the wrong way. Used to measure
+## how often normal people hit walls (tests/feel.gd).
+func _drive_rookie(game) -> Dictionary:
+	var car = game.car
+	var city = game.city
+	var dt := 1.0 / 60.0
+	var target := _choose(game)
+	var here: Vector2i = city.tile_of(car.position)
+	_repath -= dt
+	if target != _target or _repath <= 0.0 or _path.is_empty():
+		_target = target
+		_repath = 0.25
+		_path = city.route(here, target) if target.x >= 0 else []
+	var out := {"throttle": 0.0, "steer": 0.0, "drift": false}
+	if _path.size() < 2:
+		out.throttle = -1.0
+		return out
+	var aim: Vector2 = city.center(_path[mini(2, _path.size() - 1)])
+	var diff := wrapf((aim - car.position).angle() - car.heading, -PI, PI)
+	_rk_think -= dt
+	if _rk_think <= 0.0:
+		_rk_think = 0.25
+		_rk_steer = 0.0 if absf(diff) < 0.15 else signf(diff)
+	out.steer = _rk_steer
+	var to_goal: float = car.position.distance_to(city.center(target))
+	# Facing the wrong way: a U-turn, committed to one direction, like people do.
+	if absf(diff) > 2.0 and _rk_uturn == 0.0:
+		_rk_uturn = signf(diff) if diff != 0.0 else 1.0
+	if _rk_uturn != 0.0:
+		if absf(diff) < 0.8:
+			_rk_uturn = 0.0
+		else:
+			out.steer = _rk_uturn
+			out.throttle = 0.6 if car.forward_speed() < 260.0 else -1.0
+			if car.speed() < 15.0:
+				_rk_stuck += dt
+			if _rk_stuck > 0.5:      # nosed into a wall: back up a bit
+				out.throttle = -1.0
+				out.steer = -_rk_uturn
+				if _rk_stuck > 1.2:
+					_rk_stuck = 0.0
+			return out
+	# Pressing into something and not moving: back up, steering the other way.
+	if car.speed() < 15.0 and absf(diff) < 2.0:
+		_rk_stuck += dt
+		if _rk_stuck > 0.8:
+			out.throttle = -1.0
+			out.steer = -_rk_steer
+			if _rk_stuck > 1.6:
+				_rk_stuck = 0.0
+			return out
+	else:
+		_rk_stuck = 0.0
+	if to_goal < 200.0:
+		out.throttle = -1.0 if car.forward_speed() > 140.0 else 0.4   # roll in slowly
+	elif absf(diff) > 1.0:
+		out.throttle = 0.0
+	else:
+		out.throttle = 1.0
+	return out
+
+
 ## The special vehicle worth ramming on camera: the getaway car (citizen's
 ## arrest) or a motorcade SUV (diplomatic incident).
 func _prey(game) -> Dictionary:
