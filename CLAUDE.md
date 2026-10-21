@@ -78,7 +78,11 @@ A top-down arcade-taxi rideshare game in Godot 4.7 (GDScript). You drive for the
   - Per-frame overlays go into one ImmediateMesh: route, skids, request discs, light beams, surge.
   - The arrow is a no-depth-test 3D mesh. Popups are pooled Label3Ds.
   - The camera has a fixed yaw (north up, so the touch stick matches the screen), a 60° pitch, and pulls back with speed. On the menu it orbits the city.
-  - Gotcha: vertex colours need `vertex_color_is_srgb = true`, or everything looks washed out.
+  - Gotcha: vertex colours are sRGB. The city shader converts them with `pow(c, 2.2)`; StandardMaterial needs `vertex_color_is_srgb = true`.
+  - **See-through cutaway** (`shaders/cutaway.gdshaderinc`, used by `city_cutaway` and `solid_cutaway`).
+    - Any building pixel that hides a drivable tile near the car or the route ahead (`_route_ahead`) is dithered away.
+    - It is driven by global shader parameters registered in code (`cut_on`, `cut_focus`, `cut_focus2`, `cut_road_mask`).
+    - `--no-cutaway` turns it off for comparisons.
 - `scripts/fx.gd`: 2D world overlays (only visible with `--flat`), as two instances. Under the cars: skids, surge zones, requests, route, destination. Over them: the arrow and popups.
 - `scripts/hud.gd`: the shift clock, the Yoink app card, review toasts, results, the menu, touch controls (floating stick plus BRAKE/DRIFT TouchScreenButtons) and the rain overlay.
 

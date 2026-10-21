@@ -13,16 +13,17 @@ const INK := Color("2a2d36")
 var _mats := {}
 
 
-func _mat(col: Color, emission := false) -> StandardMaterial3D:
+const SOLID := preload("res://shaders/solid_cutaway.gdshader")
+
+
+## Landmarks use the same see-through cutaway as the city's buildings.
+func _mat(col: Color, emission := false) -> ShaderMaterial:
 	var key := col.to_html() + ("e" if emission else "")
 	if not _mats.has(key):
-		var m := StandardMaterial3D.new()
-		m.albedo_color = col
-		m.roughness = 0.75
-		if emission:
-			m.emission_enabled = true
-			m.emission = col
-			m.emission_energy_multiplier = 1.4
+		var m := ShaderMaterial.new()
+		m.shader = SOLID
+		m.set_shader_parameter("albedo", col)
+		m.set_shader_parameter("glow", emission)
 		_mats[key] = m
 	return _mats[key]
 

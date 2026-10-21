@@ -19,6 +19,7 @@ extends Node3D
 const City := preload("res://scripts/city.gd")
 const Riders := preload("res://scripts/riders.gd")
 const Landmarks := preload("res://scripts/landmarks.gd")
+const CUTAWAY := preload("res://shaders/city_cutaway.gdshader")
 
 const S := 32.0                 # pixels per 3D unit (a 128 px tile = 4 units)
 const PITCH := deg_to_rad(60.0) # camera tilt above the horizon
@@ -35,6 +36,8 @@ var sun: DirectionalLight3D
 var env: Environment
 var _city
 var _city_root: Node3D
+var _city_mat: ShaderMaterial   # buildings, with the see-through cutaway around the car
+var _glow_mat: ShaderMaterial
 var _look := {}                 # the city's look (cities.gd "look"), see _lk()
 var _landmarks = Landmarks.new()
 var _car: Node3D
@@ -56,6 +59,7 @@ var _smooth_pos := Vector2.ZERO  # the car's position between physics ticks
 
 
 func _ready() -> void:
+	_register_cut_globals()
 	camera = Camera3D.new()
 	camera.fov = 45.0
 	camera.far = 400.0
@@ -206,16 +210,24 @@ func build_city(city) -> void:
 	_flat(st, Rect2(-60, -60, city.w * tile + 120, city.h * tile + 120), WATER_Y - 0.3, _lk("harbour", Color("1d5a85")))   # the harbour around the city
 	var mi := MeshInstance3D.new()
 	mi.mesh = st.commit()
-	var m := StandardMaterial3D.new()
-	m.vertex_color_use_as_albedo = true
-	m.vertex_color_is_srgb = true   # our colours are ordinary (sRGB) hex colours
-	m.roughness = 0.9
-	m.cull_mode = BaseMaterial3D.CULL_DISABLED
-	mi.material_override = m
+	# One texel per tile: which tiles are drivable (the cutaway keeps those clear).
+	var mask := Image.create(city.w, city.h, false, Image.FORMAT_L8)
+	for y in city.h:
+		for x in city.w:
+			var c: String = city.cell(Vector2i(x, y))
+			var open: bool = city.is_road(Vector2i(x, y)) or c == "," or c == ":" or c == "~"
+			mask.set_pixel(x, y, Color.WHITE if open else Color.BLACK)
+	RenderingServer.global_shader_parameter_set("cut_road_mask", ImageTexture.create_from_image(mask))
+	_city_mat = ShaderMaterial.new()
+	_city_mat.shader = CUTAWAY
+	mi.material_override = _city_mat
 	_city_root.add_child(mi)
 	var glow := MeshInstance3D.new()
 	glow.mesh = _glow_st.commit()
-	glow.material_override = _unshaded(Color.WHITE, false, true)
+	_glow_mat = ShaderMaterial.new()
+	_glow_mat.shader = CUTAWAY
+	_glow_mat.set_shader_parameter("lit_windows", true)
+	glow.material_override = _glow_mat
 	glow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	_city_root.add_child(glow)
 	for p in trees:
@@ -703,6 +715,19 @@ func on_level(game) -> void:
 	_cam_target = p3(game.car.position)
 
 
+## A point about three tiles along the in-app route (or ahead of the car).
+func _route_ahead(game) -> Vector2:
+	var pts: PackedVector2Array = game.route_points
+	var walked := 0.0
+	for i in range(1, pts.size()):
+		walked += pts[i - 1].distance_to(pts[i])
+		if walked > 380.0:
+			return pts[i]
+	if pts.size() > 1:
+		return pts[pts.size() - 1]
+	return game.car.position + game.car.vel * 0.6
+
+
 ## Where the top of the car is on screen, for the speech bubble.
 func car_screen_pos() -> Vector2:
 	if _car == null or not _car.visible:
@@ -889,6 +914,8 @@ func sync(game, delta: float) -> void:
 	_car.rotation.x = -car.steer * clampf(car.speed() / 700.0, 0, 1) * 0.12
 	_car.rotation.z = (0.18 * (1.0 - 2.0 * clampf(1.0 - car.air / maxf(car.air_len, 0.01), 0, 1))) if car.air > 0.0 else 0.0
 	_sync_traffic(game)
+	# Keep clear the car and the route a few tiles ahead.
+	_set_cutaway(not game.no_cutaway, _car.position, p3(_route_ahead(game)))
 	_draw_fx(game)
 	_place_arrow(game, lift)
 	_place_popups(game)
@@ -921,7 +948,29 @@ func _follow_camera(game, delta: float) -> void:
 
 
 ## On the menu, the camera slowly circles downtown.
+## Global shader parameters are shared by every material that declares them
+## (the city and the landmarks). They're registered here once, in code, so the
+## project settings don't need editing.
+func _register_cut_globals() -> void:
+	if Engine.has_meta("cut_globals"):
+		return   # once per run (listing globals isn't available in every renderer)
+	Engine.set_meta("cut_globals", true)
+	var rs := RenderingServer
+	if true:
+		rs.global_shader_parameter_add("cut_on", RenderingServer.GLOBAL_VAR_TYPE_FLOAT, 0.0)
+		rs.global_shader_parameter_add("cut_focus", RenderingServer.GLOBAL_VAR_TYPE_VEC3, Vector3.ZERO)
+		rs.global_shader_parameter_add("cut_focus2", RenderingServer.GLOBAL_VAR_TYPE_VEC3, Vector3.ZERO)
+		rs.global_shader_parameter_add("cut_road_mask", RenderingServer.GLOBAL_VAR_TYPE_SAMPLER2D, null)
+
+
+func _set_cutaway(on: bool, at: Vector3, ahead := Vector3.ZERO) -> void:
+	RenderingServer.global_shader_parameter_set("cut_on", 1.0 if on else 0.0)
+	RenderingServer.global_shader_parameter_set("cut_focus", at)
+	RenderingServer.global_shader_parameter_set("cut_focus2", ahead if ahead != Vector3.ZERO else at)
+
+
 func _menu_camera(delta: float) -> void:
+	_set_cutaway(false, Vector3.ZERO)
 	if _city == null:
 		return
 	if _car != null:

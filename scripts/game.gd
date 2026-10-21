@@ -81,6 +81,7 @@ var _say_cd := 0.0
 var _mutter_t := 0.0
 var say_rng := RandomNumberGenerator.new()
 var look_at_tile := Vector2i(-1, -1)   # --look-at=x,y (dev): camera frames this tile
+var no_cutaway := false          # --no-cutaway (dev): draw buildings solid, for comparisons
 var cam_scale := 1.0             # 3D camera distance multiplier (--close-cam for videos)
 var clock_time := 0.0
 
@@ -101,6 +102,7 @@ func _ready() -> void:
 	if _flags.has("look-at"):
 		var xy := String(_flags["look-at"]).split(",")
 		look_at_tile = Vector2i(int(xy[0]), int(xy[1]))
+	no_cutaway = _flags.has("no-cutaway")
 	if _flags.has("close-cam"):
 		cam_scale = 0.68
 	_load_progress()
