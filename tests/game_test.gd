@@ -25,16 +25,29 @@ func _initialize() -> void:
 
 
 func _static_checks() -> void:
-	var city = City.new()
-	for row in City.MAP:
-		check(String(row).length() == city.w, "map rows all the same width")
-	check(city.cell(city.start) == "S", "the map has a start")
-	check(city.stops.size() == City.STOP_NAMES.size(), "every named stop is on the map")
+	for key in City.Cities.CITIES:
+		_check_city(City.new(key))
+	for i in Levels.count():
+		var lv: Dictionary = Levels.get_level(i)
+		check(City.Cities.CITIES.has(lv.get("city", "classic")), "shift %d city exists" % i)
+		var c = City.new(String(lv.get("city", "classic")))
+		for k in lv.kinds:
+			check(Riders.KINDS.has(k), "shift %d kind %s exists" % [i, k])
+		for e in lv.traffic:
+			check(int(e[0]) < c.loops.size(), "shift %d traffic loop %d exists" % [i, int(e[0])])
+		c.free()
+
+
+func _check_city(city) -> void:
+	for row in city.data.map:
+		check(String(row).length() == city.w, "%s: map rows all the same width" % city.key)
+	check(city.cell(city.start) == "S", "%s: the map has a start" % city.key)
+	check(city.stops.size() == city.stop_names.size(), "%s: every named stop is on the map" % city.key)
 	for letter in city.stops:
 		var r: Array = city.route(city.start, city.stops[letter])
-		check(not r.is_empty() and r.back() == city.stops[letter], "stop %s reachable" % letter)
-	for i in City.LOOPS.size():
-		var loop: Array = City.LOOPS[i]
+		check(not r.is_empty() and r.back() == city.stops[letter], "%s: stop %s reachable" % [city.key, letter])
+	for i in city.loops.size():
+		var loop: Array = city.loops[i]
 		for k in loop.size():
 			var a: Vector2i = loop[k]
 			var b: Vector2i = loop[(k + 1) % loop.size()]
@@ -42,14 +55,8 @@ func _static_checks() -> void:
 			var step := (b - a).sign()
 			var t := a
 			while t != b:
-				check(city.is_road(t) and city.cell(t) != "^", "loop %d runs on plain road at %s" % [i, t])
+				check(city.is_road(t) and city.cell(t) != "^", "%s: loop %d runs on plain road at %s" % [city.key, i, t])
 				t += step
-	for i in Levels.count():
-		var lv: Dictionary = Levels.get_level(i)
-		for k in lv.kinds:
-			check(Riders.KINDS.has(k), "shift %d kind %s exists" % [i, k])
-		for e in lv.traffic:
-			check(int(e[0]) < City.LOOPS.size(), "shift %d traffic loop exists" % i)
 	city.free()
 
 

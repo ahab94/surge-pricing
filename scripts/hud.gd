@@ -282,7 +282,7 @@ func _draw_card() -> void:
 	c.draw_string(font, Vector2(54, 142), String(_ride.name), HORIZONTAL_ALIGNMENT_LEFT, 200, 20, CREAM)
 	c.draw_string(font, Vector2(54, 160), String(kind.label), HORIZONTAL_ALIGNMENT_LEFT, -1, 15, kind.color)
 	c.draw_string(font, Vector2(230, 150), "tip $%.2f" % _ride.tip, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, GOOD)
-	var city_name: String = preload("res://scripts/city.gd").STOP_NAMES[_ride.dest]
+	var city_name: String = _ride.get("dest_name", "")
 	c.draw_string(font, Vector2(16, 188), "to " + city_name, HORIZONTAL_ALIGNMENT_LEFT, c.size.x - 32, 20, BLUE)
 	var left: float = clampf(_ride.time_left / _ride.limit, 0.0, 1.0)
 	var bar2 := Rect2(16, 200, c.size.x - 32, 10)

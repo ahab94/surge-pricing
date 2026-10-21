@@ -106,7 +106,7 @@ func _ready() -> void:
 	if not _flags.has("flat"):
 		view = View3D.new()
 		add_child(view)
-		view.build_city(City.new())
+		view.build_city(City.new(String(Levels.get_level(0).get("city", "classic"))))
 
 	camera = Camera2D.new()
 	camera.position_smoothing_enabled = true
@@ -151,7 +151,7 @@ func start_level(i: int) -> void:
 	world.name = "World"
 	add_child(world)
 	move_child(world, 0)
-	city = City.new()
+	city = City.new(String(level.get("city", "classic")))
 	world.add_child(city)
 	var under := Fx.new()
 	under.game = self
@@ -273,6 +273,7 @@ func _spawn_request() -> void:
 	var tiles: int = city.route(city.stops[letter], city.stops[dest]).size()
 	waiting.append({
 		"letter": letter, "tile": city.stops[letter], "dest": dest, "dest_tile": city.stops[dest],
+		"dest_name": city.stop_names[dest],
 		"kind": kind, "name": info.names[rng.randi() % info.names.size()],
 		"fare": snappedf((3.0 + 0.45 * tiles) * float(info.fare), 0.05),
 		"limit": (7.0 + 0.36 * tiles) * float(info.time),

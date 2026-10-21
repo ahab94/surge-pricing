@@ -3,69 +3,23 @@ extends Node2D
 ## It also answers the questions the rest of the game asks: what is at this
 ## spot, is it solid, and which way to a stop (the in-app route).
 ##
+## Every city's map, stops, traffic loops, landmarks and look live in
+## cities.gd, which tools/maps/make_cities.py generates.
+##
 ## Map letters:
-##   #  office block (solid)         h  house on a lawn (solid)
+##   #  office block (solid)         H  house on a lawn (solid)
 ##   .  road                         ,  grass (drivable, but slow)
+##   :  sand (drivable, but slow)    L  landmark footprint (solid)
 ##   T  tree (solid)                 F  fountain (solid)
-##   ~  water (solid, unless you jump it)
+##   M  hill / rock (solid)          ~  water (solid, unless you jump it)
 ##   ^  ramp: hit it fast to fly
-##   S  where the car starts         a-z  ride stops (road), named in STOP_NAMES
+##   S  where the car starts         a-z  ride stops (road), named in stop_names
+
+const Cities := preload("res://scripts/cities.gd")
 
 const TILE := 128.0
 const D := 96.0                 # the design grid the art is drawn in
 const K := TILE / D
-
-const MAP := [
-	"##########################################",
-	"#....k...................................#",
-	"#.,,,,,,.######.#######.,,,,,,,.,,,,,,,,.#",
-	"#.,T,,T,.######.#######.,h,h,h,.,h,h,h,h.#",
-	"#.,,,,,,.######r#######.,,,,,,,.,,,,,,,,n#",
-	"#.,,T,,T.######.#######.....h...,h,h,h,h.#",
-	"#.T,,,,,.######.#######.,,,,,,,.,,,,,,,,.#",
-	"#..........b.......................f.....#",
-	"#.######.######....a....#######.########.#",
-	"#.######.######......^..#######.########.#",
-	"#.######.######...FF....#######..........#",
-	"#.######j######...FF....#######o########.#",
-	"#.######.######.........#######.########.#",
-	"#.######.######.........#######.########.#",
-	"#...c..............e................i....#",
-	"#.######.######.#######.###.###.,,,,,,,,.#",
-	"#.######.######.#######.###.###.,T~~~~,,.#",
-	"#.######.......S#######.###.###.,,~~~~,,.#",
-	"#.######.######.#######m###.###.,,~~~~,,.#",
-	"#.######.######.#######.###.###.,,~~~~T,.#",
-	"#p######.######.#######.###.###.,,,,,,,,.#",
-	"#..........................g.............#",
-	"#.######.######.#######.#######.########.#",
-	"#.######.######^#######.#######^########.#",
-	"#.~~~~~~.~~~~~~~~~~~~~~.~~~~~~~~~~~~~~~~.#",
-	"#.~~~~~~.~~~~~~~~~~~~~~.~~~~~~~~~~~~~~~~.#",
-	"#.######.######^#######.#######^########.#",
-	"#...........d.......q................l...#",
-	"##########################################",
-]
-
-const STOP_NAMES := {
-	"a": "Pixel Plaza", "b": "Bean There Cafe", "c": "Swole Patrol Gym",
-	"d": "Dockside Fish Fry", "e": "City Hall-ish", "f": "Sunny Acres Home",
-	"g": "Club Thump", "h": "Startup Garage", "i": "Mega Mall-o-rama",
-	"j": "St. Bandaid's Clinic", "k": "Leafy Park Gate", "l": "Wing It Airport",
-	"m": "Big Brain University", "n": "Hilltop Lookout", "o": "Slice Slice Baby",
-	"p": "Choo-Choo Central", "q": "Ferry Terminal", "r": "Popcorn Palace",
-}
-
-## Traffic loops: corners (tiles) of closed rectangles along roads. Traffic
-## drives them in the right-hand lane. levels.gd picks which loops are busy.
-const LOOPS := [
-	[Vector2i(1, 1), Vector2i(40, 1), Vector2i(40, 27), Vector2i(1, 27)],
-	[Vector2i(8, 7), Vector2i(31, 7), Vector2i(31, 21), Vector2i(8, 21)],
-	[Vector2i(15, 1), Vector2i(23, 1), Vector2i(23, 14), Vector2i(15, 14)],
-	[Vector2i(1, 7), Vector2i(8, 7), Vector2i(8, 27), Vector2i(1, 27)],
-	[Vector2i(23, 14), Vector2i(40, 14), Vector2i(40, 21), Vector2i(23, 21)],
-	[Vector2i(31, 1), Vector2i(40, 1), Vector2i(40, 7), Vector2i(31, 7)],
-]
 
 const DIRS := [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
 const INF := 1 << 30
@@ -79,16 +33,28 @@ const WATER := Color("3b9fd6")
 const ROOFS := [Color("e8875f"), Color("f0b75a"), Color("8fb8de"), Color("b39ddb"),
 		Color("e57373"), Color("7fc8a9"), Color("f4e1a1"), Color("a1887f")]
 
+var key := ""
+var data: Dictionary = {}
 var w := 0
 var h := 0
 var stops := {}        # letter -> Vector2i
+var stop_names := {}   # letter -> landmark name
+var loops: Array = []  # traffic circuits: corner tiles of closed rectangles along roads
+var landmarks: Array = []
+var drive_left := false   # traffic keeps left (London, Tokyo, Bangkok, Singapore)
 var start := Vector2i.ZERO
 var _rows: Array = []
 var _fields := {}      # destination tile -> PackedInt32Array of route costs
 
 
-func _init() -> void:
-	_rows = MAP.duplicate()
+func _init(city_key := "classic") -> void:
+	key = city_key
+	data = Cities.CITIES[key]
+	stop_names = data.stops
+	loops = data.loops
+	landmarks = data.landmarks
+	drive_left = bool(data.get("drive_left", false))
+	_rows = data.map.duplicate()
 	h = _rows.size()
 	w = String(_rows[0]).length()
 	for y in h:
@@ -96,7 +62,7 @@ func _init() -> void:
 			var c := cell(Vector2i(x, y))
 			if c == "S":
 				start = Vector2i(x, y)
-			elif STOP_NAMES.has(c):
+			elif stop_names.has(c):
 				stops[c] = Vector2i(x, y)
 
 
@@ -123,14 +89,14 @@ func size_px() -> Vector2:
 ## Road-like: anything you can drive at full speed.
 func is_road(t: Vector2i) -> bool:
 	var c := cell(t)
-	return c == "." or c == "^" or c == "S" or STOP_NAMES.has(c)
+	return c == "." or c == "^" or c == "S" or stop_names.has(c)
 
 
 func is_solid(t: Vector2i, airborne := false) -> bool:
 	var c := cell(t)
 	if c == "~":
 		return not airborne   # you can fly over water, just not drive on it
-	return c == "#" or c == "h" or c == "T" or c == "F"
+	return c == "#" or c == "H" or c == "T" or c == "F" or c == "L" or c == "M"
 
 
 ## How far a circle at `p` with radius `r` overlaps solid tiles, as the push
@@ -150,7 +116,7 @@ func push_out(p: Vector2, r: float, airborne := false) -> Vector2:
 				if d.length() < reach and d.length() > 0.001:
 					total += d.normalized() * (reach - d.length())
 				continue
-			var inset := 14.0 * K if c == "h" else 0.0
+			var inset := 14.0 * K if c == "H" else 0.0
 			var lo := Vector2(n) * TILE + Vector2(inset, inset)
 			var hi := lo + Vector2(TILE, TILE) - Vector2(inset, inset) * 2.0
 			var q := p.clamp(lo, hi)
@@ -170,7 +136,7 @@ func push_out(p: Vector2, r: float, airborne := false) -> Vector2:
 ## only when it saves a lot, and avoids ramps (the app is not reckless; you are).
 func _cost(t: Vector2i, stunt := false) -> int:
 	var c := cell(t)
-	if c == ",":
+	if c == "," or c == ":":
 		return 4
 	if c == "^":
 		return 1 if stunt else 30
@@ -298,7 +264,7 @@ func _draw() -> void:
 			_draw_object(Vector2i(x, y))
 	for letter in stops:
 		var p := center(stops[letter]) / K
-		var label: String = STOP_NAMES[letter]
+		var label: String = stop_names[letter]
 		draw_string_outline(font, p + Vector2(-120, -30), label, HORIZONTAL_ALIGNMENT_CENTER,
 				240, 15, 5, Color(0, 0, 0, 0.55))
 		draw_string(font, p + Vector2(-120, -30), label, HORIZONTAL_ALIGNMENT_CENTER, 240, 15,
@@ -312,7 +278,7 @@ func _hash(t: Vector2i, salt := 0) -> int:
 func _draw_ground(t: Vector2i) -> void:
 	var c := cell(t)
 	var r := Rect2(Vector2(t) * D, Vector2(D, D))
-	if c == "," or c == "T" or c == "h":
+	if c == "," or c == "T" or c == "H" or c == ":":
 		draw_rect(r, GRASS)
 		for i in 4:
 			var k := _hash(t, i)
@@ -371,7 +337,7 @@ func _draw_road(t: Vector2i, r: Rect2) -> void:
 			var side := Vector2(-dir.y, dir.x) * 22
 			draw_polyline(PackedVector2Array([tip - dir * 16 + side, tip, tip - dir * 16 - side]),
 					Color.WHITE, 7)
-	if STOP_NAMES.has(c):
+	if stop_names.has(c):
 		# A pickup sign on the kerb: a pink pin on a post.
 		var post := r.position + Vector2(D - 10, 12)
 		draw_line(post, post + Vector2(0, 22), Color("d9d9d9"), 3)
@@ -383,14 +349,14 @@ func _draw_road(t: Vector2i, r: Rect2) -> void:
 ## sells the "seen from a drone" look.
 func _draw_shadow(t: Vector2i) -> void:
 	var c := cell(t)
-	if c != "#" and c != "h":
+	if c != "#" and c != "H":
 		return
 	var r := Rect2(Vector2(t) * D, Vector2(D, D))
-	if c == "h":
+	if c == "H":
 		r = r.grow(-14)
-	if not is_solid(t + Vector2i(1, 0)) or c == "h":
+	if not is_solid(t + Vector2i(1, 0)) or c == "H":
 		draw_rect(Rect2(Vector2(r.end.x, r.position.y + 14), Vector2(16, r.size.y)), Color(0, 0, 0, 0.22))
-	if not is_solid(t + Vector2i(0, 1)) or c == "h":
+	if not is_solid(t + Vector2i(0, 1)) or c == "H":
 		draw_rect(Rect2(Vector2(r.position.x + 14, r.end.y), Vector2(r.size.x, 16)), Color(0, 0, 0, 0.22))
 
 
@@ -400,7 +366,7 @@ func _draw_object(t: Vector2i) -> void:
 	match c:
 		"#":
 			_draw_building(t, r)
-		"h":
+		"H":
 			_draw_house(t, r)
 		"T":
 			draw_circle(r.get_center() + Vector2(8, 10), 34, Color(0, 0, 0, 0.2))

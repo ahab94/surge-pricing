@@ -197,7 +197,7 @@ func build_city(city) -> void:
 	for letter in city.stops:
 		var c: Vector3 = p3(city.center(city.stops[letter]))
 		var l := Label3D.new()
-		l.text = City.STOP_NAMES[letter]
+		l.text = city.stop_names[letter]
 		l.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 		l.font_size = 48
 		l.outline_size = 12
@@ -215,12 +215,12 @@ func _build_tile(st: SurfaceTool, city, t: Vector2i, r: Rect2, tile: float, tree
 		"#":
 			_flat(st, r, SIDEWALK_Y, Color("c9c2b4"))
 			_building(st, city, t, r, k)
-		",", "T", "h":
+		",", "T", "H":
 			var g := Color("78c25f").darkened(0.06 * (_hash(t) % 3))
 			_flat(st, r, 0.03, g)
 			if c == "T":
 				trees.append(Vector3(r.get_center().x, 0, r.get_center().y))
-			elif c == "h":
+			elif c == "H":
 				_house(st, t, r, k)
 		"~":
 			# The bank: stone walls down to the water wherever land meets it.
@@ -258,7 +258,7 @@ func _road(st: SurfaceTool, city, t: Vector2i, r: Rect2, k: float) -> void:
 		_box(st, Vector3(r.end.x - 0.15, 0, r.position.y), Vector3(r.end.x, 0.5, r.end.y), rail)
 	if c == "^":
 		_ramp(st, city, t, r)
-	if City.STOP_NAMES.has(c):
+	if city.stop_names.has(c):
 		# A pickup sign: a post with a pink ball on top.
 		var post := Vector3(r.end.x - 0.35, 0, r.position.y + 0.35)
 		_box(st, post - Vector3(0.05, 0, 0.05), post + Vector3(0.05, 1.6, 0.05), Color("d9d9d9"))

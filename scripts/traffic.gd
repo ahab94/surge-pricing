@@ -1,6 +1,6 @@
 extends Node2D
-## City traffic. Ordinary cars drive fixed loops (city.gd LOOPS) in the
-## right-hand lane, braking for the player and for cars ahead. Every so often
+## City traffic. Ordinary cars drive fixed loops (the city's `loops`) in their
+## lane (the right, or the left in left-driving cities), braking for the player and for cars ahead. Every so often
 ## the game spawns a *special event*: a convoy of special vehicles that drives
 ## part of a loop and then leaves:
 ##   chase      a getaway car and two police cruisers, flat out, sirens on
@@ -47,9 +47,11 @@ const EVENTS := {
 var cars: Array = []         # dicts, see _add_car
 var _paths := {}             # [loop, reversed] -> [lane path, total length]
 var _next_id := 0
+var side := 1.0              # +1 keep right, -1 keep left (London, Tokyo...)
 
 
 func setup(city, spec: Array, speed: float) -> void:
+	side = -1.0 if city.drive_left else 1.0
 	cars.clear()
 	_paths.clear()
 	for entry in spec:
@@ -67,7 +69,7 @@ func setup(city, spec: Array, speed: float) -> void:
 func _path_for(city, loop: int, reversed: bool) -> Array:
 	var key := Vector2i(loop, 1 if reversed else 0)
 	if not _paths.has(key):
-		var corners: Array = city.LOOPS[loop].duplicate()
+		var corners: Array = city.loops[loop].duplicate()
 		if reversed:
 			corners.reverse()
 		var path := _lane_path(city, corners)
@@ -78,7 +80,7 @@ func _path_for(city, loop: int, reversed: bool) -> Array:
 	return _paths[key]
 
 
-## Shift each corner of the loop into the right-hand lane. For a square
+## Shift each corner of the loop into the driving lane (right or left). For a square
 ## corner the offset is the sum of the "right" vectors of the two roads.
 func _lane_path(city, corners: Array) -> PackedVector2Array:
 	var out := PackedVector2Array()
@@ -89,7 +91,7 @@ func _lane_path(city, corners: Array) -> PackedVector2Array:
 		var c: Vector2 = city.center(corners[(i + 1) % n])
 		var din := (b - a).normalized()
 		var dout := (c - b).normalized()
-		out.append(b + (_right(din) + _right(dout)) * LANE)
+		out.append(b + (_right(din) + _right(dout)) * LANE * side)
 	return out
 
 
@@ -155,7 +157,7 @@ func spawn_event(name: String, city, rng: RandomNumberGenerator, player_pos: Vec
 	for member in ev.convoy:
 		var car := _add_car(member[0], lp[0], total, s0 - float(member[1]), ev.speed)
 		car.left = dist
-		car.shift = -LANE if ev.center else 0.0
+		car.shift = -LANE * side if ev.center else 0.0
 		car.event = name
 		_place(car)
 		car.prev_pos = car.pos
@@ -251,7 +253,7 @@ func update(dt: float, player) -> void:
 					if sv.pos.distance_to(car.pos) < SIREN_RANGE:
 						pull = true
 						break
-				car.shift = move_toward(car.shift, PULL_OVER if pull else 0.0, 60.0 * dt)
+				car.shift = move_toward(car.shift, PULL_OVER * side if pull else 0.0, 60.0 * dt)
 				if pull or _blocked(car, player):
 					target = 0.0
 			"trash":

@@ -193,11 +193,13 @@ func _choose(game) -> Vector2i:
 func _traffic(game, v: float) -> Array:
 	var car = game.car
 	var f: Vector2 = car.forward()
-	var right := Vector2(-f.y, f.x)
+	# "right" here means the kerb side: the left in left-driving cities.
+	var side: float = game.traffic.side
+	var right := Vector2(-f.y, f.x) * side
 	# Sirens nearby: hug the kerb so they pass down the middle (and no fines).
 	for npc in game.traffic.cars:
 		if npc.siren and npc.pos.distance_to(car.position) < 380.0:
-			return [PULL_RIGHT, INF]
+			return [PULL_RIGHT * side, INF]
 	var block := INF
 	for npc in game.traffic.cars:
 		if npc.dir.dot(f) < 0.3:
@@ -208,7 +210,7 @@ func _traffic(game, v: float) -> Array:
 		if along > 0.0 and along < 170.0 + 0.3 * v and lat > -24.0 and lat < 50.0:
 			block = minf(block, along)
 	if block == INF:
-		return [KEEP_RIGHT, INF]
+		return [KEEP_RIGHT * side, INF]
 	for npc in game.traffic.cars:
 		if npc.dir.dot(f) > -0.3:
 			continue
@@ -216,5 +218,5 @@ func _traffic(game, v: float) -> Array:
 		var along := d.dot(f)
 		var lat := d.dot(right)
 		if along > -40.0 and along < 500.0 and lat > -80.0 and lat < 10.0:
-			return [KEEP_RIGHT, maxf(0.0, block - 60.0)]
-	return [-OVERTAKE, INF]
+			return [KEEP_RIGHT * side, maxf(0.0, block - 60.0)]
+	return [-OVERTAKE * side, INF]
