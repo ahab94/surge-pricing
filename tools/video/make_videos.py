@@ -23,6 +23,10 @@ AUDIO = os.path.join(ROOT, "build", "video_audio")
 OUT = os.path.join(ROOT, "build", "videos")
 FONT = "/System/Library/Fonts/Supplemental/Arial Rounded Bold.ttf"
 
+PLAY = "https://ahab94.github.io/surge-pricing/"
+PLAY_SHORT = "ahab94.github.io/surge-pricing"   # shown on screen
+REPO = "https://github.com/ahab94/surge-pricing"
+
 PINK = (255, 79, 163)
 SUN = (255, 210, 63)
 GREEN = (87, 227, 107)
@@ -182,8 +186,20 @@ def card_png(path, orient, kind):
         lines = ["Your driver rating", "is your health bar."] if portrait else ["Your driver rating is your health bar."]
         centered(d, lines, sy + 170, 70 if portrait else 66, CREAM, W, stroke=8)
     else:
-        lines = ["Free in your browser.", "Coming soon."]
-        centered(d, lines, sy + 190, 70, CREAM, W, stroke=8)
+        # The play link, on screen: links in Shorts descriptions aren't clickable.
+        cy = sy + (230 if portrait else 175)
+        l1, l2 = "PLAY FREE IN YOUR BROWSER", PLAY_SHORT
+        s1 = 64
+        while d.textlength(l1, font=font(s1)) + 200 > W - 80:   # room for the play triangle
+            s1 -= 2
+        f1, f2 = font(s1), font(min(50, s1 - 6) if portrait else 46)
+        bw = min(W - 60, max(d.textlength(l1, font=f1) + 200, d.textlength(l2, font=f2) + 120))
+        bh = 200
+        d.rounded_rectangle([(W - bw) / 2, cy - bh / 2, (W + bw) / 2, cy + bh / 2], 34, fill=SUN, outline=INK, width=6)
+        tx = (W - d.textlength(l1, font=f1)) / 2 + 30
+        d.polygon([(tx - 66, cy - 74), (tx - 66, cy - 26), (tx - 24, cy - 50)], fill=INK)
+        d.text((tx, cy - 82), l1, font=f1, fill=INK)
+        d.text(((W - d.textlength(l2, font=f2)) / 2, cy + 14), l2, font=f2, fill=(30, 40, 70))
         centered(d, ["a game by ahab94"], H - (230 if portrait else 110), 44, (200, 200, 210), W, stroke=4)
     img.save(path)
 

@@ -21,7 +21,7 @@ Upload order: lead with the strongest concept (1), then alternate formats (2, 4,
 5. Livestreamers rate your driving differently
 6. My game's health bar is your driver rating
 
-## Still to do before uploading
-- **A play link.** Shorts live or die on "where can I play this?" Ship the web build (GitHub Pages), then re-render with the link on the end card.
-- Pinned comment that asks a question ("Which passenger would you be?"), to drive comments.
+## Release status
+- v0.1.0 is live: https://ahab94.github.io/surge-pricing/. Every end card shows the link.
+- Upload copy (titles, descriptions, tags, pinned comments): `youtube.md`.
 - More: ambulance chaser, a garbage-truck traffic jam with a Hustle Bro, and a Nana-in-the-rain drift.
