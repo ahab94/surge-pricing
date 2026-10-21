@@ -253,6 +253,9 @@ func _glance(n: Vector2) -> void:
 	if -vn > WALL_CRASH_SPEED and _crash_cd <= 0.0:
 		_crash_cd = 0.6
 		events.append({"type": "crash", "impact": -vn})
+	elif -vn > 110.0 and _crash_cd <= 0.0:
+		_crash_cd = 0.35
+		events.append({"type": "bump"})   # a scrape: just a sound
 
 
 ## Shared by walls and traffic: reflect the part of the velocity going into

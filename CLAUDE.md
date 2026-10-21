@@ -92,6 +92,12 @@ A top-down arcade-taxi rideshare game in Godot 4.7 (GDScript). You drive for the
     - It is driven by global shader parameters registered in code (`cut_on`, `cut_focus`, `cut_focus2`, `cut_road_mask`).
     - `--no-cutaway` turns it off for comparisons.
 - `scripts/fx.gd`: 2D world overlays (only visible with `--flat`), as two instances. Under the cars: skids, surge zones, requests, route, destination. Over them: the arrow and popups.
+- **Sound** (`scripts/sound.gd`). Every file in `audio/` comes from `python3 tools/make_audio.py` (stdlib synth, original, about 20 s to run).
+  - Music: one theme per city (named by city key) plus `menu`. M toggles it; `--no-music` turns it off.
+  - Loops: engine (pitch follows speed), skid, siren (louder as the nearest siren gets close), rain.
+  - Effects: one per game event. Passengers "talk" in gibberish blips, voiced per type (VOICES).
+  - WAVs import with QOA compression (compress/mode=2), so the web build stays small.
+  - `record_footage.sh` keeps game audio for `a-*` clips (sound previews).
 - `scripts/hud.gd`: the shift clock, the Yoink app card, review toasts, results, the menu, touch controls (floating stick plus BRAKE/DRIFT TouchScreenButtons) and the rain overlay.
 
 ## Conventions

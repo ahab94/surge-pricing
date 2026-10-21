@@ -17,6 +17,7 @@ const Fx := preload("res://scripts/fx.gd")
 const Autopilot := preload("res://scripts/autopilot.gd")
 const Hud := preload("res://scripts/hud.gd")
 const View3D := preload("res://scripts/view3d.gd")
+const Sound := preload("res://scripts/sound.gd")
 
 const SAVE_PATH := "user://progress.cfg"
 const PICKUP_RADIUS := 112.0
@@ -47,6 +48,8 @@ var camera: Camera2D
 var hud
 var bot
 var view                         # the angled 3D view; null with --flat
+var sound
+var _last_tick := 99
 var rng := RandomNumberGenerator.new()
 var review_rng := RandomNumberGenerator.new()
 var save_enabled := true
@@ -97,6 +100,10 @@ var _flags := {}
 func _ready() -> void:
 	_setup_input()
 	_parse_flags()
+	sound = Sound.new()
+	add_child(sound)
+	if _flags.has("no-music"):
+		sound.music_on = false
 	if _flags.has("speed"):
 		Engine.time_scale = float(_flags.speed)   # footage: faster pace, still every frame drawn
 	if _flags.has("look-at"):
@@ -222,6 +229,11 @@ func start_level(i: int) -> void:
 		world.visible = false
 		view.on_level(self)
 	hud.show_level(level_index, level)
+	sound.silence_loops()
+	sound.music(city.key)
+	sound.loop("rain", -4.0 if level.rain else -80.0)
+	sound.play("ui", -6.0)
+	_last_tick = 99
 	if _flags.has("clean"):
 		hud.hide_tip()   # footage for videos: captions replace the tip
 	_update_hud()
@@ -241,6 +253,8 @@ func show_menu() -> void:
 	_clear_world()
 	state = State.MENU
 	hud.show_menu(best_stars, Levels.LEVELS)
+	sound.silence_loops()
+	sound.music("menu")
 
 
 func _next_level() -> void:
@@ -352,6 +366,7 @@ func _physics_process(delta: float) -> void:
 		sp.t += delta
 	splashes = splashes.filter(func(sp) -> bool: return sp.t < 1.6)
 	traffic.update(delta, car)
+	_update_sound()
 	if state == State.DRIVING:
 		_traffic_contacts()
 		for e in car.events:
@@ -379,6 +394,28 @@ func _physics_process(delta: float) -> void:
 			_sim_time, car.position.x, car.position.y, car.speed(), car.throttle, car.steer,
 			money, clock, ride.get("dest", "-"), near_special, car.heading, car._wall_n, car._pinned])
 	_update_hud()
+
+
+## Engine, tyres and sirens follow the driving every frame.
+func _update_sound() -> void:
+	if state != State.DRIVING:
+		sound.loop("engine", -80.0)
+		sound.loop("skid", -80.0)
+		sound.loop("siren", -80.0)
+		return
+	var v: float = car.speed() / Car.MAX_SPEED
+	var rev := 1.0 if car.is_airborne() else absf(car.throttle)
+	sound.loop("engine", -16.0 + 6.0 * rev + 4.0 * v, 0.55 + 0.9 * v + 0.15 * rev)
+	sound.loop("skid", -14.0 if car.drift_time > 0.05 and not car.is_airborne() else -80.0)
+	var near_siren := INF
+	for npc in traffic.cars:
+		if npc.siren:
+			near_siren = minf(near_siren, car.position.distance_to(npc.pos))
+	sound.loop("siren", lerpf(-6.0, -36.0, clampf(near_siren / 1100.0, 0.0, 1.0)) if near_siren < 1300.0 else -80.0)
+	var secs := ceili(clock)
+	if secs <= 10 and secs < _last_tick and secs > 0:
+		sound.play("tick", -6.0, 1.0, 0.0)
+	_last_tick = secs
 
 
 func _read_controls() -> void:
@@ -418,7 +455,9 @@ func _traffic_contacts() -> void:
 					car.position += d.normalized() * (reach - d.length())
 					car.bounce(d.normalized(), traffic.velocity(npc))
 					car.touching(d.normalized())   # lets the unstick assist free you from a jam
-					npc.honk = 1.2
+					if npc.honk <= 0.0:
+						sound.play("honk", -8.0, 0.8 + 0.1 * float(npc.id % 5))
+					npc.honk = maxf(npc.honk, 1.2)
 		if touching and npc.special and npc.hit_cd <= 0.0:
 			npc.hit_cd = 2.0
 			_hit_special(npc)
@@ -449,6 +488,7 @@ func _hit_special(npc: Dictionary) -> void:
 				money += 15.0
 				_popup("CITIZEN'S ARREST! +$15", Color("57e36b"), 42)
 				_say("arrest", true)
+				sound.play("arrest", -2.0)
 				if not ride.is_empty():
 					ride.mood += 20.0 if streamer else 5.0
 		"police":
@@ -458,6 +498,7 @@ func _hit_special(npc: Dictionary) -> void:
 		"suv", "bike":
 			_fine(25.0, "DIPLOMATIC INCIDENT!")
 			_say("incident", true)
+			sound.play("incident", -3.0)
 			if not ride.is_empty():
 				ride.mood += 25.0 if streamer else -30.0
 		"trash":
@@ -498,6 +539,7 @@ func _fine(amount: float, why: String) -> void:
 	money = maxf(0.0, money - amount)
 	_popup("%s  -$%d" % [why, int(amount)], Color("ff4d6d"), 36)
 	_log_event({"type": "fine", "amount": amount})
+	sound.play("fine", -5.0)
 
 
 ## Special events: one at a time, a short break after each, cycling through
@@ -520,6 +562,7 @@ func _update_specials(delta: float) -> void:
 	_special_index += 1
 	traffic.spawn_event(name, city, rng, car.position)
 	hud.alert(String(Traffic.EVENTS[name].alert))
+	sound.play("alert", -6.0)
 	_log_event({"type": "special", "kind": name})
 
 
@@ -530,6 +573,7 @@ func _on_event(e: Dictionary) -> void:
 	match e.type:
 		"crash":
 			crashes += 1
+			sound.play("crash", -3.0)
 			_say("crash", float(e.impact) > 300.0)   # a big hit interrupts
 			if riding:
 				ride.mood += float(kind.crash)
@@ -540,11 +584,13 @@ func _on_event(e: Dictionary) -> void:
 			else:
 				_popup("BONK", Color("ff4d6d"), 30)
 		"near_miss":
+			sound.play("near", -8.0)
 			_say("near")
 			var label: String = SPECIAL_CLOSE.get(e.get("kind", "car"), "CLOSE CALL!")
 			var big: bool = e.get("kind", "car") != "car"
 			_stunt(2.5 if big else 1.0, label, 2.0 if big else 1.0)
 		"land":
+			sound.play("land", -4.0)
 			_say("jump", true)
 			var air: float = e.air
 			_stunt(2.0 + air * 4.0, "BIG AIR! %.1fs" % air, 2.0)
@@ -554,6 +600,7 @@ func _on_event(e: Dictionary) -> void:
 			_stunt(secs * 1.5, "DRIFT %.1fs" % secs, secs)
 		"splash":
 			crashes += 1
+			sound.play("splash", 0.0)
 			_say("splash", true)
 			if riding:
 				ride.mood += 12.0 if ride.kind == "streamer" else -30.0
@@ -562,7 +609,9 @@ func _on_event(e: Dictionary) -> void:
 			splashes.append({"pos": e.at, "t": 0.0})
 			_popup("SPLASH!", Color("37b7ff"), 46)
 		"takeoff":
-			pass
+			sound.play("jump", -4.0)
+		"bump":
+			sound.play("bump", -10.0)
 
 
 ## The passenger shouts something in a speech bubble. `force` interrupts a
@@ -580,6 +629,7 @@ func _say(moment: String, force := false) -> void:
 		return   # nothing new to say
 	bubble_text = line
 	bubble_t = 2.0
+	sound.talk(ride.kind, line.split(" ").size() + 1)
 	_say_cd = 1.4
 	_log_event({"type": "say", "kind": ride.kind, "text": line})
 
@@ -599,6 +649,7 @@ func _stunt(base_tip: float, label: String, weight: float) -> void:
 
 func _tip(amount: float, label: String) -> void:
 	ride.tip += amount
+	sound.play("kaching", -12.0, 1.25)
 	_popup("%s  +$%.2f" % [label, amount], Color("57e36b"), 34)
 
 
@@ -660,6 +711,7 @@ func _pick_up(w: Dictionary) -> void:
 		ride.fare *= 2.0
 	_popup("%s hopped in!" % w.name, Color("fff8e7"), 30)
 	_log_event({"type": "pickup", "kind": w.kind})
+	sound.play("pickup", -4.0)
 	_say("pickup", true)
 	_mutter_t = 0.0
 	_spawn_request()
@@ -689,6 +741,8 @@ func _drop_off() -> void:
 	var quote: String = Riders.review(ride.kind, stars, review_rng, city.key)
 	hud.toast(ride.name, stars, quote, "+$%.2f" % pay)
 	_popup("%s +%ds" % [speed_word, int(bonus)], Color("ffd23f"), 40)
+	sound.play("kaching", -3.0)
+	sound.play("review_good" if stars >= 4 else "review_bad", -6.0)
 	_log_event({"type": "dropoff", "kind": ride.kind, "stars": stars, "pay": pay, "name": ride.name, "quote": quote})
 	ride = {}
 	_update_route()
@@ -700,6 +754,7 @@ func _bail() -> void:
 	var line: String = Riders.bail_line(ride.kind, review_rng, city.key)
 	hud.toast(ride.name, 1, line, "$0")
 	_popup("They bailed!", Color("ff4d6d"), 40)
+	sound.play("review_bad", -4.0)
 	_log_event({"type": "bail", "kind": ride.kind, "name": ride.name, "quote": line})
 	ride = {}
 	_spawn_request()
@@ -755,6 +810,8 @@ func _win() -> void:
 	elif result_stars == 2:
 		info += "\nHit the goal within %d s for the third star." % int(level.par)
 	hud.show_result(true, "SHIFT COMPLETE!", info, result_stars, level_index + 1 < Levels.count())
+	sound.silence_loops()
+	sound.play("win", -2.0)
 	_report("complete")
 
 
@@ -762,6 +819,10 @@ func _lose(title: String, why: String) -> void:
 	state = State.FAILED
 	fail_reason = title
 	hud.show_result(false, title, why, 0, false)
+	sound.silence_loops()
+	if title.begins_with("DEACTIVATED"):
+		sound.play("scratch", -2.0)
+	sound.play("lose", -3.0)
 	_report("failed")
 
 
@@ -845,6 +906,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		start_level(level_index)
 	elif event.is_action_pressed("menu"):
 		show_menu()
+	elif event.is_action_pressed("music"):
+		var on: bool = sound.toggle_music()
+		if car != null:
+			_popup("Music " + ("on" if on else "off"), Color("fff8e7"), 28)
 	elif event.is_action_pressed("next") and state == State.WON:
 		_next_level()
 	elif event.is_action_pressed("next") and state == State.FAILED:
@@ -860,6 +925,7 @@ func _setup_input() -> void:
 	_add_action("retry", [KEY_R])
 	_add_action("next", [KEY_ENTER, KEY_KP_ENTER])
 	_add_action("menu", [KEY_ESCAPE])
+	_add_action("music", [KEY_M])
 
 
 func _add_action(action: String, keys: Array) -> void:

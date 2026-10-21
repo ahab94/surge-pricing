@@ -21,7 +21,7 @@ record() {  # name level seconds extra-flags...
 	local name=$1 level=$2 secs=$3; shift 3
 	if [ -n "${ONLY:-}" ] && [[ " $ONLY " != *" $name "* ]]; then return; fi
 	local res=1920x1080
-	if [[ $name == p-* ]]; then res=1080x1920; window 1080 1920; else window 1920 1080; fi
+	if [[ $name == p-* ]]; then res=1080x1920; window 1080 1920; elif [[ $name == a-* ]]; then res=1280x720; window 1280 720; else window 1920 1080; fi
 	"$GODOT" --path . --write-movie "$out/$name.avi" --fixed-fps 60 \
 		-- --level="$level" --autopilot --clean --exit-on-end --log-events --timeout="$secs" "$@" \
 		| grep -E "^(EVENT|RESULT)" > "$out/$name.events" || true
@@ -29,7 +29,11 @@ record() {  # name level seconds extra-flags...
 	# Footage recorded with --speed=S runs S game-seconds per video-second.
 	local scale=1; for f in "$@"; do [[ $f == --speed=* ]] && scale=${f#--speed=}; done
 	echo "$scale" > "$out/$name.scale"
-	ffmpeg -loglevel error -y -i "$out/$name.avi" -c:v libx264 -preset fast -crf 16 -pix_fmt yuv420p -an "$out/$name.mp4"
+	# a-* clips keep the game's own sound (sound previews); the rest are silent
+	# footage that the video tools score with music and stingers.
+	local audio=(-an)
+	[[ $name == a-* ]] && audio=(-c:a aac -b:a 160k)
+	ffmpeg -loglevel error -y -i "$out/$name.avi" -c:v libx264 -preset fast -crf 16 -pix_fmt yuv420p "${audio[@]}" "$out/$name.mp4"
 	rm "$out/$name.avi"
 	local size; size=$(ffprobe -v error -select_streams v -show_entries stream=width,height -of csv=p=0:s=x "$out/$name.mp4")
 	[ "$size" = "$res" ] || { echo "$name recorded at $size, expected $res"; exit 1; }
@@ -61,5 +65,11 @@ for spec in 0:regular:9.5 0:nana:21.5 0:hustler:9.5 1:regular:9 1:nana:12 1:hust
 	IFS=: read -r lv rider secs <<< "$spec"
 	record "p-w$lv-$rider" "$lv" "$secs" $W --rider="$rider"
 done
+# Sound previews with the game's own audio (a-*), 1280x720.
+P="--reckless --no-fail --endless --close-cam"
+record a-paris 0 14 $P --rider=nana
+record a-rome 3 14 $P --rider=nana
+record a-london 5 14 $P --rider=regular
+record a-tokyo 6 16 $P --rider=hustler
 record l-surge 5 16
 record l-rain 6 33.5

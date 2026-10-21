@@ -420,7 +420,7 @@ func _build_menu() -> void:
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(sub)
 	var keys := _label(17, Color(INK, 0.7), false)
-	keys.text = "Arrows / WASD drive   Space drift   R retry   Esc menu"
+	keys.text = "Arrows / WASD drive   Space drift   R retry   M music   Esc menu"
 	keys.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(keys)
 	_level_list = GridContainer.new()   # one column on phones, two on wide screens (see _layout)
