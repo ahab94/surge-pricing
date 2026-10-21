@@ -6,7 +6,7 @@ route, drive like a maniac for tips, and beat the shift clock. But your **driver
 is your health bar**: every passenger leaves a review, and if your rating sinks below
 the floor, the app deactivates you.
 
-Made with Godot 4.7, everything drawn in code. Working title; not yet released.
+Made with Godot 4.7, everything built in code: an angled 3D city over a 2D arcade simulation. Working title; not yet released.
 
 ## Controls
 
@@ -62,6 +62,9 @@ Stars per shift: ★ hit the goal, ★★ finish with a rating of 4.7+, ★★�
   downtown blocks, a park, suburbs, a plaza with a fountain and ramp, a lake, and a canal
   with bridges on some avenues and ramps on others. Shifts change who rides, the traffic,
   the goal and the weather.
+- **3D look, 2D brain.** The rules run on a flat 2D map, which keeps them simple,
+  deterministic and testable. `view3d.gd` builds the city in 3D from the same map and
+  draws everything under a tilted camera. The bot, tests and replays don't know about it.
 - **Arcade car, not a physics body.** Push along the nose, bleed off sideways speed
   ("grip"), and drop the grip for drifts. That gives tight control and exactly
   repeatable runs.

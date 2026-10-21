@@ -16,6 +16,7 @@ const Traffic := preload("res://scripts/traffic.gd")
 const Fx := preload("res://scripts/fx.gd")
 const Autopilot := preload("res://scripts/autopilot.gd")
 const Hud := preload("res://scripts/hud.gd")
+const View3D := preload("res://scripts/view3d.gd")
 
 const SAVE_PATH := "user://progress.cfg"
 const PICKUP_RADIUS := 84.0
@@ -41,6 +42,7 @@ var traffic
 var camera: Camera2D
 var hud
 var bot
+var view                         # the angled 3D view; null with --flat
 var rng := RandomNumberGenerator.new()
 var review_rng := RandomNumberGenerator.new()
 var save_enabled := true
@@ -78,6 +80,13 @@ func _ready() -> void:
 	_setup_input()
 	_parse_flags()
 	_load_progress()
+
+	# The game simulates in 2D; view3d.gd draws it in 3D. --flat keeps the
+	# original top-down 2D drawing (handy for debugging).
+	if not _flags.has("flat"):
+		view = View3D.new()
+		add_child(view)
+		view.build_city(City.new())
 
 	camera = Camera2D.new()
 	camera.position_smoothing_enabled = true
@@ -167,6 +176,9 @@ func start_level(i: int) -> void:
 	camera.zoom = Vector2.ONE * _zoom()
 	camera.reset_smoothing()
 	_update_route()
+	if view:
+		world.visible = false
+		view.on_level(self)
 	hud.show_level(level_index, level)
 	_update_hud()
 
@@ -411,7 +423,7 @@ func _popup(text: String, color: Color, size: int) -> void:
 		if p.t > 0.5:
 			lift += 46.0
 	popups.append({"text": text, "color": color, "size": size,
-			"pos": car.position + Vector2(0, -50.0 - lift), "t": 1.4})
+			"pos": car.position + Vector2(0, -50.0 - lift), "stack": lift / 46.0, "t": 1.4})
 
 
 func _update_ride(delta: float) -> void:
@@ -591,7 +603,9 @@ func _update_route() -> void:
 		arrow_dir = (aim - car.position).normalized()
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	if view:
+		view.sync(self, delta)
 	if car != null:
 		var ahead: Vector2 = car.vel * 0.35
 		camera.position = car.position + ahead.limit_length(220.0)

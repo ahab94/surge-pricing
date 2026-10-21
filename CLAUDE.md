@@ -46,7 +46,15 @@ A top-down arcade-taxi rideshare game in Godot 4.7 (GDScript). You drive for the
   - Follows the route with lookahead and keeps right.
   - Corner speed comes from v² = 2ad and slows in the rain.
   - Overtakes on the left when there's no oncoming car, and three-point-turns when the route is behind it.
-- `scripts/fx.gd`: world overlays, as two instances. Under the cars: skids, surge zones, requests, route, destination. Over them: the arrow and popups.
+- `scripts/view3d.gd`: the angled 3D view, on by default (`--flat` gives back the 2D drawing).
+  - It draws the 2D simulation in 3D every frame and changes no rules. A 2D pixel (x, y) is the 3D point (x/32, height, y/32).
+  - The static city is one vertex-coloured SurfaceTool mesh, built once and kept between shifts: buildings get taller toward downtown, plus houses, ramps, banks, bridges, trees and the fountain.
+  - Cars are box meshes. The player's body has an X-ray next_pass, so it shows through buildings.
+  - Per-frame overlays go into one ImmediateMesh: route, skids, request discs, light beams, surge.
+  - The arrow is a no-depth-test 3D mesh. Popups are pooled Label3Ds.
+  - The camera has a fixed yaw (north up, so the touch stick matches the screen), a 60° pitch, and pulls back with speed. On the menu it orbits the city.
+  - Gotcha: vertex colours need `vertex_color_is_srgb = true`, or everything looks washed out.
+- `scripts/fx.gd`: 2D world overlays (only visible with `--flat`), as two instances. Under the cars: skids, surge zones, requests, route, destination. Over them: the arrow and popups.
 - `scripts/hud.gd`: the shift clock, the Yoink app card, review toasts, results, the menu, touch controls (floating stick plus BRAKE/DRIFT TouchScreenButtons) and the rain overlay.
 
 ## Conventions
