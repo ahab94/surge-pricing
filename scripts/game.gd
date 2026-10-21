@@ -278,7 +278,7 @@ func _spawn_request() -> void:
 	waiting.append({
 		"letter": letter, "tile": city.stops[letter], "dest": dest, "dest_tile": city.stops[dest],
 		"dest_name": city.stop_names[dest],
-		"kind": kind, "name": info.names[rng.randi() % info.names.size()],
+		"kind": kind, "name": Riders.pick_name(kind, rng, city.key), "label": Riders.label(kind, city.key),
 		"fare": snappedf((3.0 + 0.45 * tiles) * float(info.fare), 0.05),
 		"limit": (7.0 + 0.36 * tiles) * float(info.time),
 		"band": 0 if tiles < 16 else (1 if tiles < 30 else 2),
@@ -565,13 +565,13 @@ func _on_event(e: Dictionary) -> void:
 func _say(moment: String, force := false) -> void:
 	if ride.is_empty() or (_say_cd > 0.0 and not force):
 		return
-	var line: String = Riders.say(ride.kind, moment, say_rng)
+	var line: String = Riders.say(ride.kind, moment, say_rng, city.key)
 	for k in 3:   # don't say the same thing twice in a row
 		if line != bubble_text:
 			break
-		line = Riders.say(ride.kind, moment, say_rng)
-	if line == "":
-		return
+		line = Riders.say(ride.kind, moment, say_rng, city.key)
+	if line == "" or (line == bubble_text and not force):
+		return   # nothing new to say
 	bubble_text = line
 	bubble_t = 2.0
 	_say_cd = 1.4
@@ -588,7 +588,7 @@ func _stunt(base_tip: float, label: String, weight: float) -> void:
 	if float(kind.tip) > 0.0:
 		_tip(base_tip * float(kind.tip), label)
 	else:
-		_popup(label + "  (Nana frowns)", Color("ff9ec4"), 30)
+		_popup(label + "  (%s frowns)" % ride.get("label", "Nana"), Color("ff9ec4"), 30)
 
 
 func _tip(amount: float, label: String) -> void:
@@ -680,7 +680,7 @@ func _drop_off() -> void:
 	clock += bonus
 	reviews.append(stars)
 	rides_done += 1
-	var quote: String = Riders.review(ride.kind, stars, review_rng)
+	var quote: String = Riders.review(ride.kind, stars, review_rng, city.key)
 	hud.toast(ride.name, stars, quote, "+$%.2f" % pay)
 	_popup("%s +%ds" % [speed_word, int(bonus)], Color("ffd23f"), 40)
 	_log_event({"type": "dropoff", "kind": ride.kind, "stars": stars, "pay": pay, "name": ride.name, "quote": quote})
@@ -691,7 +691,7 @@ func _drop_off() -> void:
 func _bail() -> void:
 	reviews.append(1)
 	bails += 1
-	var line: String = Riders.bail_line(ride.kind, review_rng)
+	var line: String = Riders.bail_line(ride.kind, review_rng, city.key)
 	hud.toast(ride.name, 1, line, "$0")
 	_popup("They bailed!", Color("ff4d6d"), 40)
 	_log_event({"type": "bail", "kind": ride.kind, "name": ride.name, "quote": line})

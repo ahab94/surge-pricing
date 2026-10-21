@@ -32,7 +32,8 @@ simulation. No art files, no licensed music. If you enjoy it, a ⭐ on the repo 
 | Brake / reverse | Down / S | BRAKE button |
 | Retry / menu / next | R / Esc / Enter | Buttons |
 
-Every passenger shouts in a speech bubble: Nana on a crash ("I'm calling your mother."),
+Every passenger shouts in a speech bubble, in their city's voice ("MY LASAGNA!" in Rome,
+"Wah lao!" in Singapore, "Hey, I'm RIDIN' here!" in New York): Nana on a crash ("I'm calling your mother."),
 the Livestreamer on a jump ("CHAT ARE YOU SEEING THIS?!"), the Hustle Bro on a splash
 ("Liquidity event!").
 

@@ -27,6 +27,7 @@ func _initialize() -> void:
 func _static_checks() -> void:
 	for key in City.Cities.CITIES:
 		_check_city(City.new(key))
+	_check_locales()
 	for i in Levels.count():
 		var lv: Dictionary = Levels.get_level(i)
 		check(City.Cities.CITIES.has(lv.get("city", "classic")), "shift %d city exists" % i)
@@ -36,6 +37,24 @@ func _static_checks() -> void:
 		for e in lv.traffic:
 			check(int(e[0]) < c.loops.size(), "shift %d traffic loop %d exists" % [i, int(e[0])])
 		c.free()
+
+
+## Every local voice belongs to a real city and passenger type, uses known
+## moments and star levels, and has no empty lists.
+func _check_locales() -> void:
+	var moments := ["pickup", "crash", "jump", "near", "splash", "slow", "fast", "drift", "arrest", "incident"]
+	for c in Riders.Locales.LOCALES:
+		check(City.Cities.CITIES.has(c), "locale %s is a city" % c)
+		for kind in Riders.Locales.LOCALES[c]:
+			check(Riders.KINDS.has(kind), "locale %s: %s is a passenger type" % [c, kind])
+			var loc: Dictionary = Riders.Locales.LOCALES[c][kind]
+			for m in loc.get("says", {}):
+				check(m in moments and not loc.says[m].is_empty(), "locale %s/%s: moment %s" % [c, kind, m])
+			for st in loc.get("reviews", {}):
+				check(int(st) >= 1 and int(st) <= 5 and not loc.reviews[st].is_empty(), "locale %s/%s: %s-star reviews" % [c, kind, st])
+			for key in ["names", "bail"]:
+				if loc.has(key):
+					check(not loc[key].is_empty(), "locale %s/%s: %s" % [c, kind, key])
 
 
 func _check_city(city) -> void:

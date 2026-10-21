@@ -1,4 +1,6 @@
 extends RefCounted
+
+const Locales := preload("res://scripts/locales.gd")
 ## Passenger types. Each one reacts differently to how you drive, which is the
 ## whole game: the same stunt that makes a Livestreamer tip big makes Nana
 ## leave one star.
@@ -123,16 +125,34 @@ static func stars_for(mood: float) -> int:
 	return clampi(ceili(mood / 20.0), 1, 5)
 
 
-static func review(kind: String, stars: int, rng: RandomNumberGenerator) -> String:
-	var lines: Array = KINDS[kind].reviews[stars - 1]
-	return lines[rng.randi() % lines.size()]
+## The city's version of a passenger type, or {} (locales.gd).
+static func _local(kind: String, city: String) -> Dictionary:
+	return Locales.LOCALES.get(city, {}).get(kind, {})
 
 
-static func bail_line(kind: String, rng: RandomNumberGenerator) -> String:
-	var lines: Array = KINDS[kind].bail
-	return lines[rng.randi() % lines.size()]
-
-
-static func say(kind: String, moment: String, rng: RandomNumberGenerator) -> String:
-	var lines: Array = KINDS[kind].says.get(moment, [])
+## Lines from the city's locale when it has them, else the general ones.
+static func _pick(lines: Array, rng: RandomNumberGenerator) -> String:
 	return "" if lines.is_empty() else String(lines[rng.randi() % lines.size()])
+
+
+static func label(kind: String, city := "") -> String:
+	return String(_local(kind, city).get("label", KINDS[kind].label))
+
+
+## One rng call either way, so forcing a type or city keeps rides identical.
+static func pick_name(kind: String, rng: RandomNumberGenerator, city := "") -> String:
+	return _pick(_local(kind, city).get("names", KINDS[kind].names), rng)
+
+
+static func review(kind: String, stars: int, rng: RandomNumberGenerator, city := "") -> String:
+	var local: Array = _local(kind, city).get("reviews", {}).get(stars, [])
+	return _pick(local if not local.is_empty() else KINDS[kind].reviews[stars - 1], rng)
+
+
+static func bail_line(kind: String, rng: RandomNumberGenerator, city := "") -> String:
+	return _pick(_local(kind, city).get("bail", KINDS[kind].bail), rng)
+
+
+static func say(kind: String, moment: String, rng: RandomNumberGenerator, city := "") -> String:
+	var local: Array = _local(kind, city).get("says", {}).get(moment, [])
+	return _pick(local if not local.is_empty() else KINDS[kind].says.get(moment, []), rng)

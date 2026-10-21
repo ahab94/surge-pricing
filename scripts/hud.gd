@@ -280,7 +280,7 @@ func _draw_card() -> void:
 	c.draw_circle(Vector2(30, 146), 14, kind.color)
 	_face(c, Vector2(30, 146), _ride.mood)
 	c.draw_string(font, Vector2(54, 142), String(_ride.name), HORIZONTAL_ALIGNMENT_LEFT, 200, 20, CREAM)
-	c.draw_string(font, Vector2(54, 160), String(kind.label), HORIZONTAL_ALIGNMENT_LEFT, -1, 15, kind.color)
+	c.draw_string(font, Vector2(54, 160), String(_ride.get("label", kind.label)), HORIZONTAL_ALIGNMENT_LEFT, -1, 15, kind.color)
 	c.draw_string(font, Vector2(230, 150), "tip $%.2f" % _ride.tip, HORIZONTAL_ALIGNMENT_LEFT, -1, 18, GOOD)
 	var city_name: String = _ride.get("dest_name", "")
 	c.draw_string(font, Vector2(16, 188), "to " + city_name, HORIZONTAL_ALIGNMENT_LEFT, c.size.x - 32, 20, BLUE)

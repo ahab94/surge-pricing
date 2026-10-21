@@ -53,6 +53,10 @@ A top-down arcade-taxi rideshare game in Godot 4.7 (GDScript). You drive for the
     - They brake for the player and for cars ahead going their way. Crossing cars yield by index, so no deadlocks.
   - `circles()` (enough circles to cover long trucks), `radius()` and `velocity()` are used for contacts.
 - `scripts/riders.gd`: passenger types: mood and tip tuning, names, reviews per star level, bail lines, and `says` (speech-bubble lines per moment). game.gd `_say()` shows them in the HUD speech bubble, pinned above the car via `view3d.car_screen_pos()`.
+- `scripts/locales.gd`: local passenger voices per city and type: label (Nonna, Nan, Salaryman...), names, says (per moment), 1- and 5-star reviews, and bail lines.
+  - riders.gd falls back to the general lines.
+  - Tone: affectionate everyday local expressions, no mocking accents, nothing religious, no real businesses.
+  - `tests/game_test.gd` validates every entry.
 - `scripts/levels.gd`: the World Tour, 10 cities, one level each. Fields: city, goal, clock, rating floor, rider mix, traffic loops, traffic_mix (local vehicles: bus, cab, tuktuk, scooter, supercar), car_colors, specials, surge, rain, night, par, seed.
   - Bot times currently rise from about 43 s to 112 s.
   - Pars are about 1.4× the bot's time.
