@@ -51,5 +51,15 @@ record l-same-streamer 3 32 --reckless --rider=streamer --no-fail --endless --sp
 record p-nana-action 5 200 --reckless --rider=nana --speed=1.3 --close-cam --linger=2.5
 record p-hustler 4 44 --rider=hustler --reckless --endless --no-fail --speed=1.3 --close-cam
 record p-streamer 2 90 --rider=streamer --stunts --endless --no-fail --speed=1.3 --close-cam
+# World Tour: the same reckless drive per city with different passengers
+# (identical crashes, so we pick the funniest local reaction). w-<level>-<rider>.
+W="--reckless --no-fail --endless --speed=1.3 --close-cam"
+for spec in 0:regular:9.5 0:nana:21.5 0:hustler:9.5 1:regular:9 1:nana:12 1:hustler:9 2:nana:15.5 2:hustler:6.5 \
+		3:nana:17 3:hustler:42.5 4:hustler:7.5 4:nana:15 5:nana:16 5:hustler:10 6:hustler:22 6:nana:25 \
+		7:regular:13.5 7:nana:16.5 7:hustler:12.5 8:regular:13.5 8:nana:21 8:hustler:13.5 \
+		9:regular:21.5 9:nana:27.5 9:hustler:13.5; do
+	IFS=: read -r lv rider secs <<< "$spec"
+	record "p-w$lv-$rider" "$lv" "$secs" $W --rider="$rider"
+done
 record l-surge 5 16
 record l-rain 6 33.5

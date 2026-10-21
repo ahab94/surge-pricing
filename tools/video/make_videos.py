@@ -88,6 +88,25 @@ def caption_png(path, text, style, orient):
         cy = H * (0.36 - 0.155 if style == "tag_top" else 0.74 - 0.155) + 40
         d.rounded_rectangle([40, cy - 40, 40 + tw, cy + 40], 26, fill=PINK + (240,), outline=INK, width=5)
         d.text((70, cy - 30), text, font=f, fill=(255, 255, 255))
+    elif style == "city":   # "ROME" big, the passenger's local name under it
+        title, sub = (lines + [""])[:2]
+        f1, f2 = font(96), font(52)
+        bw = max(d.textlength(title, font=f1), d.textlength(sub, font=f2)) + 110
+        cy = H * (0.27 if portrait else 0.2)
+        d.rounded_rectangle([(W - bw) / 2, cy - 95, (W + bw) / 2, cy + 95], 36, fill=INK + (235,))
+        d.text(((W - d.textlength(title, font=f1)) / 2, cy - 88), title, font=f1, fill=SUN)
+        d.text(((W - d.textlength(sub, font=f2)) / 2, cy + 18), sub, font=f2, fill=CREAM)
+    elif style == "quote":   # the passenger's line, big, in a speech bubble below the car
+        size = fit(d, lines, 76 if portrait else 66, W, 170)
+        f = font(size)
+        bw = max(d.textlength(l, font=f) for l in lines) + 90
+        bh = len(lines) * size * 1.15 + 50
+        cy = H * (0.66 if portrait else 0.74)
+        x0, y0 = (W - bw) / 2, cy - bh / 2
+        d.polygon([(W / 2 - 30, y0 + 3), (W / 2 + 30, y0 + 3), (W / 2, y0 - 46)], fill=(255, 255, 255, 250))
+        d.line([(W / 2 - 30, y0), (W / 2, y0 - 46), (W / 2 + 30, y0)], fill=INK, width=7)
+        d.rounded_rectangle([x0, y0, x0 + bw, y0 + bh], 34, fill=(255, 255, 255, 250), outline=INK, width=7)
+        centered(d, lines, cy, size, INK, W, stroke=0)
     elif style == "hook_top":   # hook above a split screen
         size = fit(d, lines, 76, W, 120)
         f = font(size)

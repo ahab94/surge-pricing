@@ -1,6 +1,74 @@
 # YouTube upload copy
 
 Upload Private first, review, then publish one a day (see shorts.md for the order).
+**v0.2.0 World Tour Shorts first.**
+
+## short-crash-world.mp4
+
+**Title:** Same crash, 10 cities #shorts
+
+**Description:**
+```
+▶ PLAY FREE in your browser: https://ahab94.github.io/surge-pricing/
+
+How passengers react to the same crash in Paris, New York, Rio, Rome, Dubai, London, Tokyo, Istanbul, Bangkok and Singapore.
+
+Surge Pricing is a free arcade rideshare game where your driver rating is your health bar. Ten cities, local passengers, police chases and a VIP motorcade you must not touch. Made with the Godot engine; every car, building and line is built in code.
+
+⭐ Open source on GitHub (a star helps a lot): https://github.com/ahab94/surge-pricing
+⬇ Windows / Mac / Linux: https://github.com/ahab94/surge-pricing/releases/latest
+
+#surgepricing #indiegame #gamedev #godot #shorts
+```
+
+**Tags:** surge pricing, indie game, rideshare game, driving game, browser game, free game, godot, funny game, around the world
+
+**Pinned comment:** Play free: https://ahab94.github.io/surge-pricing/  Which city should I add next?
+
+## short-grandma-world.mp4
+
+**Title:** Grandma rates my driving in 10 cities #shorts
+
+**Description:**
+```
+▶ PLAY FREE in your browser: https://ahab94.github.io/surge-pricing/
+
+Nonna, Nan, Obaachan, Ah Ma... every grandma has a review.
+
+Surge Pricing is a free arcade rideshare game where your driver rating is your health bar. Ten cities, local passengers, police chases and a VIP motorcade you must not touch. Made with the Godot engine; every car, building and line is built in code.
+
+⭐ Open source on GitHub (a star helps a lot): https://github.com/ahab94/surge-pricing
+⬇ Windows / Mac / Linux: https://github.com/ahab94/surge-pricing/releases/latest
+
+#surgepricing #indiegame #gamedev #godot #shorts
+```
+
+**Tags:** surge pricing, indie game, rideshare game, driving game, browser game, free game, godot, funny game, around the world
+
+**Pinned comment:** Play free: https://ahab94.github.io/surge-pricing/  Which grandma was the harshest?
+
+## short-hustler-world.mp4
+
+**Title:** The Hustle Bro in 10 cities #shorts
+
+**Description:**
+```
+▶ PLAY FREE in your browser: https://ahab94.github.io/surge-pricing/
+
+Finance Bro, Crypto Bro, City Banker, Salaryman: same ride, same chaos.
+
+Surge Pricing is a free arcade rideshare game where your driver rating is your health bar. Ten cities, local passengers, police chases and a VIP motorcade you must not touch. Made with the Godot engine; every car, building and line is built in code.
+
+⭐ Open source on GitHub (a star helps a lot): https://github.com/ahab94/surge-pricing
+⬇ Windows / Mac / Linux: https://github.com/ahab94/surge-pricing/releases/latest
+
+#surgepricing #indiegame #gamedev #godot #shorts
+```
+
+**Tags:** surge pricing, indie game, rideshare game, driving game, browser game, free game, godot, funny game, around the world
+
+**Pinned comment:** Play free: https://ahab94.github.io/surge-pricing/  Which one would you drive?
+
 Settings: category Gaming; audience "No, it's not made for kids"; playlist "Surge Pricing".
 
 ## short-same-ride.mp4

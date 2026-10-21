@@ -1,5 +1,18 @@
 # Surge Pricing: Shorts plan
 
+## v0.2.0 World Tour Shorts (recorded on the live version)
+
+| Video | Hook | Payoff |
+|---|---|---|
+| `short-crash-world` | "Same crash. 10 cities." | The same crash, a local reaction per city: "My croissant!!", "Hey, I'm RIDIN' here!", "MY LASAGNA!", "Rug pull!", "Mind my teapot!", "I will need to file a report.", "Wah lao!" |
+| `short-grandma-world` | "Grandma rates my driving in 10 cities" | Mamie, Grandma, Vovo, Nonna, Teta, Nan, Obaachan, Babaanne, Yai, Ah Ma: ten 1-star reviews in ten local voices |
+| `short-hustler-world` | "The Hustle Bro in 10 cities" | Finance Bro, Crypto Bro, City Banker, Salaryman, Fintech Bro: "If I'm late, I bow for an hour." |
+
+Lead with `short-crash-world`. The format ("same X, 10 cities") invites "do my city next!" comments, which is free engagement. Reply to those with the next video.
+
+## v0.1 Shorts (the original test city)
+
+
 Every Short opens on a one-line premise in the first second. The punchline is a passenger's speech bubble or a big review card, so it reads with the sound off. Footage is real gameplay driven by the autopilot. Build everything with `tools/video/` (see CLAUDE.md).
 
 | # | Video | Hook (first second) | Payoff | Length |

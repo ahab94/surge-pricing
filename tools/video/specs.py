@@ -232,4 +232,102 @@ VIDEOS = [
           reviews=[(0, 14.35, 3.0, "ChadCam", 5, "Best content of my career. 5 stars + follow."),
                    (2, 87.15, 3.0, "TotallyNotBot", 1, "Ending stream. Walking.")],
           outro=2.5),
+
+    *[]]
+
+
+# ---------------------------------------------------------------- World Tour
+# Moments are looked up in the recorded event logs by their exact line, so
+# re-recording never breaks the edit.
+
+import json as _json
+import re as _re
+
+CITY_NAMES = ["PARIS", "NEW YORK", "RIO", "ROME", "DUBAI", "LONDON", "TOKYO", "ISTANBUL", "BANGKOK", "SINGAPORE"]
+
+
+def _events(clip):
+    out = []
+    try:
+        for line in open(os.path.join(FOOTAGE, clip + ".events")):
+            m = _re.match(r"EVENT t=([\d.]+) (.*)", line)
+            if m:
+                out.append((float(m.group(1)), _json.loads(m.group(2))))
+    except OSError:
+        pass
+    return out
+
+
+def said(clip, text):
+    """Game time of the first time someone says `text` in a clip."""
+    for t, e in _events(clip):
+        if e.get("type") == "say" and e.get("text") == text:
+            return t
+    raise KeyError(f"{clip}: nobody says {text!r}")
+
+
+def first_review(clip):
+    for t, e in _events(clip):
+        if e.get("type") == "dropoff":
+            return t, e["name"], e["stars"], e["quote"]
+    raise KeyError(f"{clip}: no drop-off")
+
+
+def _montage(vid, hook, picks, before, after, hold=0.0, review_cards=False):
+    """One short segment per city: the city tag, then the punchline."""
+    segs, cues, cards = [], [], []
+    for i, (lv, rider, label, text) in enumerate(picks):
+        clip = f"p-w{lv}-{rider}"
+        try:
+            if review_cards:
+                t, name, stars, quote = first_review(clip)
+            else:
+                t = said(clip, text)
+        except KeyError:
+            continue   # footage not recorded yet
+        segs.append((clip, t - before, t + after, 1.0) + ((hold,) if hold else ()))
+        n = len(segs) - 1
+        cues.append((n, t - before, t + after + hold * scale(clip), "cap", f"{CITY_NAMES[lv]}\n{label}", "city"))
+        if review_cards:
+            cards.append((n, t + 0.05, after + hold * scale(clip) - 0.05, name, stars, quote))
+            cues.append((n, t, None, "sfx", "notify", 0.8))
+        else:
+            cues.append((n, t, t + after, "cap", text, "quote"))
+            cues.append((n, t, None, "sfx", "bonk", 0.7))
+    if segs:
+        clip0, a0 = segs[0][0], segs[0][1]
+        cues.append((0, a0, a0 + 1.9 * scale(clip0), "cap", hook, "hook_top"))
+    return video(vid, "portrait", segments=segs, cues=cues, reviews=cards, outro=2.5)
+
+
+VIDEOS += [
+    _montage("short-crash-world", "Same crash.\n10 cities.", [
+        (0, "regular", "Parisian", "My croissant!!"),
+        (1, "regular", "New Yorker", "Hey, I'm RIDIN' here!"),
+        (2, "nana", "Vovo", "Ai! My hip, menino!"),
+        (3, "nana", "Nonna", "MY LASAGNA!"),
+        (4, "hustler", "Crypto Bro", "Rug pull! That was a rug pull!"),
+        (5, "nana", "Nan", "Mind my teapot!"),
+        (6, "hustler", "Salaryman", "I will need to file a report."),
+        (7, "regular", "Istanbullu", "My tea glass!!"),
+        (8, "regular", "Bangkokian", "Mai pen rai... no wait, it IS a problem!"),
+        (9, "regular", "Singaporean", "Wah lao!"),
+    ], before=1.3, after=2.0),
+    _montage("short-grandma-world", "Grandma rates my driving\nin 10 cities", [
+        (0, "nana", "Mamie", ""), (1, "nana", "Grandma", ""), (2, "nana", "Vovo", ""), (3, "nana", "Nonna", ""),
+        (4, "nana", "Teta", ""), (5, "nana", "Nan", ""), (6, "nana", "Obaachan", ""), (7, "nana", "Babaanne", ""),
+        (8, "nana", "Yai", ""), (9, "nana", "Ah Ma", ""),
+    ], before=1.4, after=0.1, hold=2.3, review_cards=True),
+    _montage("short-hustler-world", "The Hustle Bro\nin 10 cities", [
+        (0, "hustler", "Start-up Bro", "That is a write-off. Tres cher."),
+        (1, "hustler", "Finance Bro", "That's a write-off. Expensing it."),
+        (2, "hustler", "Hustle Bro", "Rapido! My pitch is at the beach club."),
+        (3, "hustler", "Hustle Bro", "Rome took ages to build. My ride shouldn't!"),
+        (4, "hustler", "Crypto Bro", "Quick, I'm minting at noon."),
+        (5, "hustler", "City Banker", "That's a write-off. Bill my firm."),
+        (6, "hustler", "Salaryman", "If I'm late, I bow for an hour."),
+        (7, "hustler", "Hustle Bro", "Slower than the bridge at rush hour."),
+        (8, "hustler", "Hustle Bro", "That's a write-off. Mai pen rai, insurance."),
+        (9, "hustler", "Fintech Bro", "Quick lah, investor call in five."),
+    ], before=1.0, after=2.0),
 ]
