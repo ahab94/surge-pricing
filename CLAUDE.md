@@ -16,7 +16,7 @@ A top-down arcade-taxi rideshare game in Godot 4.7 (GDScript). You drive for the
   - `--timeout=S` counts simulated seconds.
   - `--screenshot=path.png --wait=S` saves a frame after S simulated seconds, then quits.
   - `--special=chase|ambulance|trash|motorcade` starts that event at once, close by. `--watch-special` makes the camera follow it (screenshots, video cutaways). `--stunts` makes the bot route over ramps and the canal. `--hunt` makes it ram the getaway car or the motorcade. `--special-at=S` delays `--special`. `--close-cam` brings the 3D camera about 30% closer (footage).
-  - `--clean` hides the shift tip (for footage).
+  - `--clean` hides the shift tip (for footage). `--look-at=x,y` points the camera at a tile (landmark checks).
   - Comedy footage flags:
     - `--rider=KIND` forces every passenger's type, and the rides still match.
     - `--reckless` makes the bot drive full speed with no manners.
@@ -28,8 +28,12 @@ A top-down arcade-taxi rideshare game in Godot 4.7 (GDScript). You drive for the
 - Portrait: `godot --path . --resolution 720x1280 -- ...`. The game switches its base size to 720x1280 when the window is taller than wide.
 
 ## Layout
-- `scripts/city.gd`: the map, as ASCII rows (the legend is at the top of the file).
-  - STOP_NAMES are the parody landmarks. LOOPS are the traffic circuits.
+- **Cities:** `tools/maps/make_cities.py` generates `scripts/cities.gd`. Never edit the generated file; edit the script and run `python3 tools/maps/make_cities.py`.
+  - Each `@city` function draws on a Map: `grid`, `rect`, `water_h` / `water_v` (bridges and ramps), `park`, `landmark` (solid L tiles plus a model), `prop` (model only), `stop`, `start_at`, `loop`.
+  - The script asserts that every stop is reachable and that every loop runs on plain road.
+  - The `look` keys are documented in view3d.gd `_lk()`.
+  - Landmark kinds are in `scripts/landmarks.gd`: generic silhouettes only, no replicas or trademarks.
+- `scripts/city.gd`: loads a city by key (`City.new("paris")`). It holds the map and answers queries: `stop_names`, `loops`, `landmarks`, `drive_left`.
   - TILE is 128 px of game space. The art is drawn on a 96 px design grid (D) and scaled by K.
   - Routes come from a cached Dijkstra cost-to-go field per destination (bucket queue). Roads cost 1, grass 4, ramps 30.
   - `push_out` handles collisions: a box per solid tile, round trees, inset houses.
@@ -49,7 +53,9 @@ A top-down arcade-taxi rideshare game in Godot 4.7 (GDScript). You drive for the
     - They brake for the player and for cars ahead going their way. Crossing cars yield by index, so no deadlocks.
   - `circles()` (enough circles to cover long trucks), `radius()` and `velocity()` are used for contacts.
 - `scripts/riders.gd`: passenger types: mood and tip tuning, names, reviews per star level, bail lines, and `says` (speech-bubble lines per moment). game.gd `_say()` shows them in the HUD speech bubble, pinned above the car via `view3d.car_screen_pos()`.
-- `scripts/levels.gd`: shifts as data: goal, clock, rating floor, rider mix, traffic loops, surge, rain, par, seed.
+- `scripts/levels.gd`: the World Tour, 10 cities, one level each. Fields: city, goal, clock, rating floor, rider mix, traffic loops, traffic_mix (local vehicles: bus, cab, tuktuk, scooter, supercar), car_colors, specials, surge, rain, night, par, seed.
+  - Bot times currently rise from about 43 s to 112 s.
+  - Pars are about 1.4× the bot's time.
 - `scripts/game.gd`: the shift rules:
   - requests, pickup and drop-off, fare and tip payout, clock bonuses;
   - mood, reviews and rating;

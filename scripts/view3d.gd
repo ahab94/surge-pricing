@@ -18,6 +18,7 @@ extends Node3D
 
 const City := preload("res://scripts/city.gd")
 const Riders := preload("res://scripts/riders.gd")
+const Landmarks := preload("res://scripts/landmarks.gd")
 
 const S := 32.0                 # pixels per 3D unit (a 128 px tile = 4 units)
 const PITCH := deg_to_rad(60.0) # camera tilt above the horizon
@@ -34,7 +35,11 @@ var sun: DirectionalLight3D
 var env: Environment
 var _city
 var _city_root: Node3D
+var _look := {}                 # the city's look (cities.gd "look"), see _lk()
+var _landmarks = Landmarks.new()
 var _car: Node3D
+var _headlights: SpotLight3D
+var _glow_st: SurfaceTool        # lit windows, drawn unshaded (night cities)
 var _vehicles := {}             # traffic id -> {node, honk, lights}
 var _siren_mats: Array = []     # [red, blue, dark] for flashing light bars
 var _fx_mesh: ImmediateMesh
@@ -165,14 +170,31 @@ func _hash(t: Vector2i, salt := 0) -> int:
 # ---------------------------------------------------------------- the static city
 
 ## Builds the city once. Every shift uses the same map, so it's kept between shifts.
+## The city's look, with defaults. Keys (all optional):
+##   facades [colours]  roof (colour; default: facade, darker)  sidewalk, grass,
+##   sand, water, harbour, asphalt, lane, sky (colours)
+##   h_min, h_step, h_boost (building heights)  center (Vector2i: downtown)
+##   trees ("round" | "palm" | "pine" | "blossom")  sun (energy)  neon (bool)
+func _lk(key: String, default):
+	return _look.get(key, default)
+
+
+## Builds a city's 3D model. The same city is kept between its levels; a
+## different one replaces it.
 func build_city(city) -> void:
-	if _city_root != null:
+	if _city_root != null and _city != null and _city.key == city.key:
 		return
+	if _city_root != null:
+		_city_root.queue_free()
 	_city = city
+	_look = city.data.get("look", {})
 	_city_root = Node3D.new()
 	add_child(_city_root)
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	_glow_st = SurfaceTool.new()
+	_glow_st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	_face(_glow_st, [Vector3(0, -5, 0), Vector3(0.01, -5, 0), Vector3(0.01, -5, 0.01), Vector3(0, -5, 0.01)], Vector3.UP, Color.BLACK)   # never empty
 	var tile := City.TILE / S
 	var trees: Array = []
 	for y in city.h:
@@ -181,7 +203,7 @@ func build_city(city) -> void:
 			var r := Rect2(Vector2(x, y) * tile, Vector2(tile, tile))
 			_build_tile(st, city, t, r, tile, trees)
 	# Ground outside the map, so the camera never sees the void.
-	_flat(st, Rect2(-60, -60, city.w * tile + 120, city.h * tile + 120), WATER_Y - 0.3, Color("1d5a85"))   # the harbour around the city
+	_flat(st, Rect2(-60, -60, city.w * tile + 120, city.h * tile + 120), WATER_Y - 0.3, _lk("harbour", Color("1d5a85")))   # the harbour around the city
 	var mi := MeshInstance3D.new()
 	mi.mesh = st.commit()
 	var m := StandardMaterial3D.new()
@@ -191,9 +213,19 @@ func build_city(city) -> void:
 	m.cull_mode = BaseMaterial3D.CULL_DISABLED
 	mi.material_override = m
 	_city_root.add_child(mi)
+	var glow := MeshInstance3D.new()
+	glow.mesh = _glow_st.commit()
+	glow.material_override = _unshaded(Color.WHITE, false, true)
+	glow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_city_root.add_child(glow)
 	for p in trees:
 		_tree(p)
 	_build_water(city, tile)
+	for lm in city.landmarks:
+		var node: Node3D = _landmarks.build(lm)
+		node.position = Vector3((float(lm.x) + float(lm.w) * 0.5) * tile, 0.0, (float(lm.y) + float(lm.h) * 0.5) * tile)
+		node.rotation.y = deg_to_rad(float(lm.get("turn", 0.0)))
+		_city_root.add_child(node)
 	for letter in city.stops:
 		var c: Vector3 = p3(city.center(city.stops[letter]))
 		var l := Label3D.new()
@@ -213,10 +245,16 @@ func _build_tile(st: SurfaceTool, city, t: Vector2i, r: Rect2, tile: float, tree
 	var k := tile / City.D            # design px (96 grid) -> units
 	match c:
 		"#":
-			_flat(st, r, SIDEWALK_Y, Color("c9c2b4"))
+			_flat(st, r, SIDEWALK_Y, _lk("sidewalk", Color("c9c2b4")))
 			_building(st, city, t, r, k)
+		":":
+			_flat(st, r, 0.03, Color(_lk("sand", Color("ecd9a5"))).darkened(0.04 * (_hash(t) % 3)))
+		"L":
+			_flat(st, r, 0.05, _lk("plaza", Color("cfc6b4")))
+		"M":
+			_hill(st, city, t, r)
 		",", "T", "H":
-			var g := Color("78c25f").darkened(0.06 * (_hash(t) % 3))
+			var g: Color = Color(_lk("grass", Color("78c25f"))).darkened(0.06 * (_hash(t) % 3))
 			_flat(st, r, 0.03, g)
 			if c == "T":
 				trees.append(Vector3(r.get_center().x, 0, r.get_center().y))
@@ -237,12 +275,12 @@ func _build_tile(st: SurfaceTool, city, t: Vector2i, r: Rect2, tile: float, tree
 
 func _road(st: SurfaceTool, city, t: Vector2i, r: Rect2, k: float) -> void:
 	var c: String = city.cell(t)
-	_flat(st, r, 0.0, Color("3d4250"))
+	_flat(st, r, 0.0, _lk("asphalt", Color("3d4250")))
 	var road_l: bool = city.is_road(t + Vector2i(-1, 0))
 	var road_r: bool = city.is_road(t + Vector2i(1, 0))
 	var road_u: bool = city.is_road(t + Vector2i(0, -1))
 	var road_d: bool = city.is_road(t + Vector2i(0, 1))
-	var paint := Color("f2d24b")
+	var paint: Color = _lk("lane", Color("f2d24b"))
 	if c != "^":
 		if road_l and road_r and not road_u and not road_d:
 			for i in 2:
@@ -256,6 +294,15 @@ func _road(st: SurfaceTool, city, t: Vector2i, r: Rect2, k: float) -> void:
 		_box(st, Vector3(r.position.x, 0, r.position.y), Vector3(r.position.x + 0.15, 0.5, r.end.y), rail)
 	if city.cell(t + Vector2i(1, 0)) == "~":
 		_box(st, Vector3(r.end.x - 0.15, 0, r.position.y), Vector3(r.end.x, 0.5, r.end.y), rail)
+	if c == "X":
+		# Scramble crossing: zebra stripes both ways and across.
+		for i in 5:
+			var o := 0.35 + i * 0.7
+			_flat(st, Rect2(r.position.x + o, r.position.y + 0.3, 0.35, r.size.y - 0.6), 0.015, Color("f2f2f2"))
+		for i in 2:
+			var a0 := r.position + Vector2(0.4 + i * 1.6, 0.4)
+			_face(st, [Vector3(a0.x, 0.02, a0.y), Vector3(a0.x + 0.4, 0.02, a0.y),
+					Vector3(a0.x + 3.2, 0.02, a0.y + 2.8), Vector3(a0.x + 2.8, 0.02, a0.y + 2.8)], Vector3.UP, Color("f2f2f2"))
 	if c == "^":
 		_ramp(st, city, t, r)
 	if city.stop_names.has(c):
@@ -267,6 +314,9 @@ func _road(st: SurfaceTool, city, t: Vector2i, r: Rect2, k: float) -> void:
 
 ## A wedge rising toward the water (or north, on dry land).
 func _ramp(st: SurfaceTool, city, t: Vector2i, r: Rect2) -> void:
+	if city.cell(t + Vector2i(1, 0)) == "~" or city.cell(t + Vector2i(-1, 0)) == "~":
+		_ramp_ew(st, city.cell(t + Vector2i(1, 0)) == "~", r)
+		return
 	var toward_south: bool = city.cell(t + Vector2i(0, 1)) == "~"
 	var lo_z := r.end.y if not toward_south else r.position.y
 	var hi_z := r.position.y + 0.4 if not toward_south else r.end.y - 0.4
@@ -297,6 +347,28 @@ func _ramp(st: SurfaceTool, city, t: Vector2i, r: Rect2) -> void:
 	_face(st, [b, c, Vector3(x1, 0, hi_z), b], Vector3.RIGHT, yellow.darkened(0.2))
 
 
+## The same wedge for a ramp that launches east or west.
+func _ramp_ew(st: SurfaceTool, toward_east: bool, r: Rect2) -> void:
+	var lo_x := r.position.x if toward_east else r.end.x
+	var hi_x := r.end.x - 0.4 if toward_east else r.position.x + 0.4
+	var h := 0.9
+	var z0 := r.position.y + 0.25
+	var z1 := r.end.y - 0.25
+	var yellow := Color("ffd23f")
+	var a := Vector3(lo_x, 0, z0)
+	var b := Vector3(lo_x, 0, z1)
+	var c := Vector3(hi_x, h, z1)
+	var d := Vector3(hi_x, h, z0)
+	var n := Vector3(-h * (1 if toward_east else -1), absf(hi_x - lo_x), 0).normalized()
+	_face(st, [a, b, c, d], n, yellow)
+	for i in 3:
+		var f0 := 0.2 + i * 0.27
+		var f1 := f0 + 0.1
+		_face(st, [a.lerp(d, f0) + Vector3(0, 0.02, 0), b.lerp(c, f0) + Vector3(0, 0.02, 0),
+				b.lerp(c, f1) + Vector3(0, 0.02, 0), a.lerp(d, f1) + Vector3(0, 0.02, 0)], n, Color("2a2d36"))
+	_face(st, [d, c, Vector3(hi_x, 0, z1), Vector3(hi_x, 0, z0)], Vector3(1 if toward_east else -1, 0, 0), yellow.darkened(0.3))
+
+
 func _bank(st: SurfaceTool, r: Rect2, d: Vector2i) -> void:
 	var stone := Color("8a8f99")
 	var x0 := r.position.x
@@ -319,10 +391,12 @@ func _building(st: SurfaceTool, city, t: Vector2i, r: Rect2, k: float) -> void:
 	# Each 2x2 chunk is one building. Height grows toward the plaza (downtown).
 	var chunk := Vector2i(t.x / 2, t.y / 2)
 	var hk := _hash(chunk, 7)
-	var downtown := 1.0 - clampf(Vector2(t).distance_to(Vector2(19, 11)) / 22.0, 0.0, 1.0)
-	var h := 1.1 + float(hk % 5) * 0.3 + downtown * 2.4
-	var wall: Color = FACADES[hk % FACADES.size()]
-	var roof := wall.darkened(0.12)
+	var c: Vector2i = _lk("center", Vector2i(19, 11))
+	var downtown := 1.0 - clampf(Vector2(t).distance_to(Vector2(c)) / 22.0, 0.0, 1.0)
+	var h: float = float(_lk("h_min", 1.1)) + float(hk % 5) * float(_lk("h_step", 0.3)) + downtown * float(_lk("h_boost", 2.4))
+	var facades: Array = _lk("facades", FACADES)
+	var wall: Color = facades[hk % facades.size()]
+	var roof: Color = _lk("roof", wall.darkened(0.12))
 	var inset := 10.0 * k
 	var lo := Vector3(r.position.x, SIDEWALK_Y, r.position.y)
 	var hi := Vector3(r.end.x, h, r.end.y)
@@ -339,22 +413,33 @@ func _building(st: SurfaceTool, city, t: Vector2i, r: Rect2, k: float) -> void:
 		hi.z -= inset
 	_box(st, lo, hi, wall, roof)
 	# Window bands on street-facing walls.
-	var glass := Color("33475f")
+	var glass: Color = _lk("glass", Color("33475f"))
+	# In a night city, most windows are lit: they go in the unshaded mesh.
+	var wst: SurfaceTool = _glow_st if _lk("night_windows", false) and _hash(t, 21) % 4 != 0 else st
+	if wst == _glow_st:
+		glass = [Color("ffd98a"), Color("ffe9b8"), Color("bfe3ff")][_hash(t, 22) % 3]
 	var y := 0.7
 	while y + 0.5 < h:
 		if open[Vector2i(0, 1)]:
-			_face(st, [Vector3(lo.x + 0.25, y, hi.z + 0.02), Vector3(hi.x - 0.25, y, hi.z + 0.02),
+			_face(wst, [Vector3(lo.x + 0.25, y, hi.z + 0.02), Vector3(hi.x - 0.25, y, hi.z + 0.02),
 					Vector3(hi.x - 0.25, y + 0.38, hi.z + 0.02), Vector3(lo.x + 0.25, y + 0.38, hi.z + 0.02)], Vector3.BACK, glass)
 		if open[Vector2i(0, -1)]:
-			_face(st, [Vector3(lo.x + 0.25, y, lo.z - 0.02), Vector3(hi.x - 0.25, y, lo.z - 0.02),
+			_face(wst, [Vector3(lo.x + 0.25, y, lo.z - 0.02), Vector3(hi.x - 0.25, y, lo.z - 0.02),
 					Vector3(hi.x - 0.25, y + 0.38, lo.z - 0.02), Vector3(lo.x + 0.25, y + 0.38, lo.z - 0.02)], Vector3.FORWARD, glass)
 		if open[Vector2i(1, 0)]:
-			_face(st, [Vector3(hi.x + 0.02, y, lo.z + 0.25), Vector3(hi.x + 0.02, y, hi.z - 0.25),
+			_face(wst, [Vector3(hi.x + 0.02, y, lo.z + 0.25), Vector3(hi.x + 0.02, y, hi.z - 0.25),
 					Vector3(hi.x + 0.02, y + 0.38, hi.z - 0.25), Vector3(hi.x + 0.02, y + 0.38, lo.z + 0.25)], Vector3.RIGHT, glass)
 		if open[Vector2i(-1, 0)]:
-			_face(st, [Vector3(lo.x - 0.02, y, lo.z + 0.25), Vector3(lo.x - 0.02, y, hi.z - 0.25),
+			_face(wst, [Vector3(lo.x - 0.02, y, lo.z + 0.25), Vector3(lo.x - 0.02, y, hi.z - 0.25),
 					Vector3(lo.x - 0.02, y + 0.38, hi.z - 0.25), Vector3(lo.x - 0.02, y + 0.38, lo.z + 0.25)], Vector3.LEFT, glass)
 		y += 0.8
+	# Neon signs on street-facing walls (one city's look).
+	if _lk("neon", false) and _hash(t, 11) % 3 == 0 and h > 2.0:
+		var neon: Color = [Color("ff3fa4"), Color("3ff0ff"), Color("ffe03f"), Color("9d5bff")][_hash(t, 12) % 4]
+		if open[Vector2i(0, 1)]:
+			_box(st, Vector3(lo.x + 0.6, 0.9, hi.z + 0.03), Vector3(lo.x + 1.1, h - 0.4, hi.z + 0.2), neon)
+		elif open[Vector2i(1, 0)]:
+			_box(st, Vector3(hi.x + 0.03, 0.9, lo.z + 0.6), Vector3(hi.x + 0.2, h - 0.4, lo.z + 1.1), neon)
 	# Rooftop clutter.
 	match _hash(t, 3) % 5:
 		0, 1:
@@ -384,7 +469,79 @@ func _house(st: SurfaceTool, t: Vector2i, r: Rect2, k: float) -> void:
 	_box(st, Vector3(hi.x - 0.7, hi.y, lo.z + 0.3), Vector3(hi.x - 0.4, top + 0.2, lo.z + 0.6), Color("7a5c4a"))
 
 
+## Rock and hill tiles: taller the further from the edge of the outcrop, so a
+## cluster of them reads as a mountain.
+func _hill(st: SurfaceTool, city, t: Vector2i, r: Rect2) -> void:
+	var depth := 0
+	for d in range(1, 6):
+		var inside := true
+		for dd in [Vector2i(d, 0), Vector2i(-d, 0), Vector2i(0, d), Vector2i(0, -d)]:
+			if city.cell(t + dd) != "M":
+				inside = false
+		if not inside:
+			break
+		depth = d
+	var hgt := 2.0 + depth * 3.2 + float(_hash(t) % 3) * 0.4
+	var rock: Color = _lk("rock", Color("8b8f7a"))
+	_box(st, Vector3(r.position.x, 0, r.position.y), Vector3(r.end.x, hgt, r.end.y), rock.darkened(0.04 * (_hash(t) % 4)),
+			Color(_lk("grass", Color("78c25f"))).darkened(0.2))
+
+
 func _tree(p: Vector3) -> void:
+	match String(_lk("trees", "round")):
+		"palm":
+			_palm(p)
+			return
+		"pine":   # umbrella pines: a tall bare trunk and a flat crown
+			var trunk := MeshInstance3D.new()
+			var cyl := CylinderMesh.new()
+			cyl.top_radius = 0.12
+			cyl.bottom_radius = 0.18
+			cyl.height = 2.4
+			cyl.radial_segments = 6
+			trunk.mesh = cyl
+			trunk.material_override = _mat(Color("7a5c4a"))
+			trunk.position = p + Vector3(0, 1.2, 0)
+			_city_root.add_child(trunk)
+			var top := MeshInstance3D.new()
+			var cr := CylinderMesh.new()
+			cr.top_radius = 1.1
+			cr.bottom_radius = 1.5
+			cr.height = 0.7
+			cr.radial_segments = 10
+			top.mesh = cr
+			top.material_override = _mat(Color("3f7a3a"))
+			top.position = p + Vector3(0, 2.6, 0)
+			_city_root.add_child(top)
+			return
+	_round_tree(p, Color("f2a7c3") if _lk("trees", "") == "blossom" else Color("3f8f3a"))
+
+
+func _palm(p: Vector3) -> void:
+	var trunk := MeshInstance3D.new()
+	var cyl := CylinderMesh.new()
+	cyl.top_radius = 0.1
+	cyl.bottom_radius = 0.2
+	cyl.height = 3.0
+	cyl.radial_segments = 6
+	trunk.mesh = cyl
+	trunk.material_override = _mat(Color("9c7a54"))
+	trunk.position = p + Vector3(0, 1.5, 0)
+	trunk.rotation.z = 0.12
+	_city_root.add_child(trunk)
+	for i in 6:   # fronds
+		var leaf := MeshInstance3D.new()
+		var b := BoxMesh.new()
+		b.size = Vector3(1.6, 0.06, 0.35)
+		leaf.mesh = b
+		leaf.material_override = _mat(Color("4f9a3c"))
+		var a := i * TAU / 6.0
+		leaf.position = p + Vector3(0.18, 3.0, 0) + Vector3(cos(a), 0, sin(a)) * 0.7
+		leaf.rotation = Vector3(0, -a, -0.35)
+		_city_root.add_child(leaf)
+
+
+func _round_tree(p: Vector3, crown: Color) -> void:
 	var trunk := MeshInstance3D.new()
 	var cyl := CylinderMesh.new()
 	cyl.top_radius = 0.15
@@ -402,7 +559,7 @@ func _tree(p: Vector3) -> void:
 	sph.radial_segments = 8
 	sph.rings = 4
 	top.mesh = sph
-	top.material_override = _mat(Color("3f8f3a"))
+	top.material_override = _mat(crown)
 	top.position = p + Vector3(0, 1.7, 0)
 	_city_root.add_child(top)
 
@@ -450,7 +607,7 @@ func _build_water(city, tile: float) -> void:
 	var mi := MeshInstance3D.new()
 	mi.mesh = st.commit()
 	var m := StandardMaterial3D.new()
-	m.albedo_color = Color("2a7fb8")
+	m.albedo_color = _lk("water", Color("2a7fb8"))
 	m.roughness = 0.4
 	mi.material_override = m
 	_city_root.add_child(mi)
@@ -515,14 +672,30 @@ func on_level(game) -> void:
 	if _car == null:
 		_car = make_car(Color("9be24a"), true)
 		add_child(_car)
+		_headlights = SpotLight3D.new()
+		_headlights.position = Vector3(0.8, 0.6, 0)
+		_headlights.rotation = Vector3(-0.22, -PI / 2.0, 0)   # spot lights shine along -Z; the car faces +X
+		_headlights.spot_range = 16.0
+		_headlights.spot_angle = 38.0
+		_headlights.light_energy = 4.0
+		_headlights.light_color = Color("fff1c4")
+		_car.add_child(_headlights)
 	for id in _vehicles:
 		_vehicles[id].node.queue_free()
 		_vehicles[id].honk.queue_free()
 	_vehicles.clear()
 	var rain: bool = game.level.rain
-	sun.light_energy = 0.45 if rain else 0.8
-	env.background_color = Color("5d6b80") if rain else Color("8fd0f5")
+	var night: bool = game.level.get("night", false)
+	sun.light_energy = 0.45 if rain else float(_lk("sun", 0.8))
+	env.background_color = Color("5d6b80") if rain else _lk("sky", Color("8fd0f5"))
 	env.ambient_light_color = Color(0.7, 0.75, 0.9) if rain else Color(0.85, 0.88, 1.0)
+	env.ambient_light_energy = 0.55
+	if night:
+		sun.light_energy = 0.18
+		env.background_color = Color("0d1430")
+		env.ambient_light_color = Color(0.45, 0.5, 0.85)
+		env.ambient_light_energy = 0.45
+	_headlights.visible = night
 	env.fog_enabled = rain
 	env.fog_light_color = Color("7d8aa0")
 	env.fog_density = 0.012
@@ -649,6 +822,39 @@ func _make_vehicle(npc: Dictionary) -> Dictionary:
 			helmet.name = "Helmet"
 			lights.append(_part(root, Vector3(0.1, 0.12, 0.1), Vector3(0.38, 0.55, -0.06), Color.BLUE))
 			lights.append(_part(root, Vector3(0.1, 0.12, 0.1), Vector3(0.38, 0.55, 0.06), Color.RED))
+		"bus":   # a red double-decker
+			root = Node3D.new()
+			_part(root, Vector3(2.6, 1.0, 0.92), Vector3(0, 0.75, 0), col)
+			_part(root, Vector3(2.6, 0.95, 0.92), Vector3(0, 1.75, 0), col)
+			for yy in [0.95, 1.9]:
+				_part(root, Vector3(2.4, 0.32, 0.94), Vector3(-0.05, yy, 0), Color("1f2a3a"))
+			_part(root, Vector3(2.62, 0.06, 0.94), Vector3(0, 2.25, 0), col.lightened(0.15))
+			_wheels(root, 0.95, 0.46)
+		"cab":
+			root = make_car(col, false)
+			_part(root, Vector3(0.26, 0.16, 0.5), Vector3(-0.05, 1.05, 0), Color("fff7d6"))   # roof sign
+			_part(root, Vector3(1.5, 0.08, 0.84), Vector3(0, 0.5, 0), Color("1d1f26"))       # checker stripe
+		"tuktuk":   # three wheels, a canopy, open sides
+			root = Node3D.new()
+			_part(root, Vector3(1.0, 0.4, 0.62), Vector3(-0.05, 0.36, 0), col)
+			_part(root, Vector3(0.3, 0.45, 0.4), Vector3(0.45, 0.55, 0), col.darkened(0.2))
+			_part(root, Vector3(1.05, 0.08, 0.66), Vector3(-0.08, 1.1, 0), Color("1d4f9a"))
+			for z in [-0.28, 0.28]:
+				_part(root, Vector3(0.06, 0.6, 0.06), Vector3(-0.45, 0.8, z), Color("dddddd"))
+				_part(root, Vector3(0.06, 0.6, 0.06), Vector3(0.3, 0.8, z), Color("dddddd"))
+				_part(root, Vector3(0.3, 0.3, 0.1), Vector3(-0.35, 0.15, z), Color("1d1f26"))
+			_part(root, Vector3(0.3, 0.3, 0.1), Vector3(0.5, 0.15, 0), Color("1d1f26"))
+		"scooter":
+			root = Node3D.new()
+			_part(root, Vector3(0.8, 0.28, 0.2), Vector3(0, 0.3, 0), col)
+			_part(root, Vector3(0.28, 0.45, 0.3), Vector3(-0.1, 0.68, 0), Color("38404d"))
+			_part(root, Vector3(0.22, 0.22, 0.22), Vector3(-0.08, 1.0, 0), col.lightened(0.3))
+		"supercar":
+			root = Node3D.new()
+			_part(root, Vector3(1.55, 0.3, 0.84), Vector3(0, 0.28, 0), col)
+			_part(root, Vector3(0.7, 0.22, 0.66), Vector3(-0.15, 0.52, 0), Color("1a2230"))
+			_part(root, Vector3(0.12, 0.06, 0.84), Vector3(-0.72, 0.62, 0), Color("17181c"))
+			_wheels(root, 0.5, 0.44)
 		_:
 			root = make_car(col, false)
 	add_child(root)
@@ -694,6 +900,8 @@ func _follow_camera(game, delta: float) -> void:
 	var ahead: Vector2 = (car.vel * 0.35).limit_length(220.0)
 	var lim: Vector2 = game.city.size_px()
 	var focus: Vector2 = (_smooth_pos + ahead) if game.splash_hold <= 0.0 else game.splash_pos
+	if game.look_at_tile.x >= 0:   # dev flag --look-at=x,y: frame a landmark
+		focus = game.city.center(game.look_at_tile)
 	if game.watch_special():
 		var lead: Dictionary = game.watch_special()
 		focus = lead.pos + lead.dir * 60.0

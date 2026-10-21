@@ -75,26 +75,32 @@ Every so often the app flashes an alert and something special hits the streets:
 
 Close calls with any of them tip extra.
 
-### Shifts (v0.1)
+### The World Tour
 
-Each shift adds one thing.
+Ten cities, one shift each. Every city adds one new thing:
 
-1. **First Shift**: pick up, follow the arrow, drop off.
-2. **Close Calls**: traffic; near-miss tips.
-3. **Content Creators**: Livestreamers and ramps.
-4. **Sunny Acres**: Nana.
-5. **Hustle Hour**: Hustle Bros and drifting.
-6. **Surge!**: moving pink surge zones; pickups inside pay double.
-7. **Rain Check**: slick roads.
+| # | City | New | Flavor |
+|---|---|---|---|
+| 1 | Paris | The basics: pick up, follow the arrow, drop off | River bridges, a big roundabout with an arch, an iron lattice tower |
+| 2 | New York | Traffic and close calls | A strict grid of yellow cabs, a huge park, a harbor statue |
+| 3 | Rio | Livestreamers and ramps | Beach avenue, sugarloaf hills, a canal to fly over |
+| 4 | Rome | Nana | Scooters, an ancient arena roundabout, a coin fountain |
+| 5 | Dubai | Hustle Bros and the VIP motorcade | Supercars, desert, a super-tall spire, a palm island to jump |
+| 6 | London | Driving on the left, and rain | Red double-deckers, a clock tower, an observation wheel |
+| 7 | Tokyo | Surge zones and drifting | A scramble crossing, neon, cherry blossoms, a red lattice tower |
+| 8 | Istanbul | Police chases | A strait split by two long bridges |
+| 9 | Bangkok | Canals and tuk-tuk swarms, monsoon | Canals everywhere, a jagged tower |
+| 10 | Singapore | The night shift: everything at once | Giant metal trees, a bay to jump, city lights |
 
-Stars per shift: ★ hit the goal, ★★ finish with a rating of 4.7+, ★★★ also beat the par time.
+Landmarks are generic shapes and every business is a parody.
+
+Stars per city: ★ hit the goal, ★★ finish with a rating of 4.7+, ★★★ also beat the par time.
 
 ## Design notes
 
-- **One city, many shifts.** The city is a 42×29 tile map (`scripts/city.gd`) with
-  downtown blocks, a park, suburbs, a plaza with a fountain and ramp, a lake, and a canal
-  with bridges on some avenues and ramps on others. Shifts change who rides, the traffic,
-  the goal and the weather.
+- **Cities are data.** Each city is a few lines in `tools/maps/make_cities.py` (roads,
+  rivers, parks, landmarks, stops, traffic loops, look). The script checks every map (all
+  stops reachable, traffic loops on clean road) and writes `scripts/cities.gd`.
 - **3D look, 2D brain.** The rules run on a flat 2D map, which keeps them simple,
   deterministic and testable. `view3d.gd` builds the city in 3D from the same map and
   draws everything under a tilted camera. The bot, tests and replays don't know about it.

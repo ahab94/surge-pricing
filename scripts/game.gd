@@ -80,6 +80,7 @@ var bubble_t := 0.0
 var _say_cd := 0.0
 var _mutter_t := 0.0
 var say_rng := RandomNumberGenerator.new()
+var look_at_tile := Vector2i(-1, -1)   # --look-at=x,y (dev): camera frames this tile
 var cam_scale := 1.0             # 3D camera distance multiplier (--close-cam for videos)
 var clock_time := 0.0
 
@@ -97,6 +98,9 @@ func _ready() -> void:
 	_parse_flags()
 	if _flags.has("speed"):
 		Engine.time_scale = float(_flags.speed)   # footage: faster pace, still every frame drawn
+	if _flags.has("look-at"):
+		var xy := String(_flags["look-at"]).split(",")
+		look_at_tile = Vector2i(int(xy[0]), int(xy[1]))
 	if _flags.has("close-cam"):
 		cam_scale = 0.68
 	_load_progress()
@@ -158,7 +162,7 @@ func start_level(i: int) -> void:
 	world.add_child(under)
 	traffic = Traffic.new()
 	world.add_child(traffic)
-	traffic.setup(city, level.traffic, float(level.traffic_speed))
+	traffic.setup(city, level.traffic, float(level.traffic_speed), level.get("traffic_mix", {}), level.get("car_colors", []))
 	car = Car.new()
 	world.add_child(car)
 	car.setup(city.center(city.start), -PI / 2.0)

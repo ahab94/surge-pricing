@@ -51,7 +51,7 @@ var _result_stars: Control
 var _result_star_count := 0
 var _next_button: Button
 var _menu_panel: PanelContainer
-var _level_list: VBoxContainer
+var _level_list: GridContainer
 var _touch: Node2D
 var _brake: TouchScreenButton
 var _drift: TouchScreenButton
@@ -395,7 +395,7 @@ func show_menu(stars: Dictionary, levels: Array) -> void:
 		var earned: int = stars.get(i, 0)
 		var b := _button("%d.  %s" % [i + 1, levels[i].name], func() -> void: level_chosen.emit(i))
 		b.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		b.custom_minimum_size = Vector2(520, 50)
+		b.custom_minimum_size = Vector2(380, 50)
 		b.draw.connect(func() -> void:
 			for s in 3:
 				_star(b, Vector2(b.size.x - 96 + s * 34, b.size.y * 0.5), 13.0, 1.0 if s < earned else 0.0))
@@ -416,15 +416,16 @@ func _build_menu() -> void:
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(title)
 	var sub := _label(22, INK, false)
-	sub.text = "Drive fast. Get tipped. Stay above 4 stars."
+	sub.text = "World Tour: 10 cities. Drive fast, get tipped, stay above 4 stars."
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(sub)
 	var keys := _label(17, Color(INK, 0.7), false)
 	keys.text = "Arrows / WASD drive   Space drift   R retry   Esc menu"
 	keys.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	box.add_child(keys)
-	_level_list = VBoxContainer.new()
-	_level_list.add_theme_constant_override("separation", 6)
+	_level_list = GridContainer.new()   # one column on phones, two on wide screens (see _layout)
+	_level_list.add_theme_constant_override("h_separation", 10)
+	_level_list.add_theme_constant_override("v_separation", 6)
 	box.add_child(_level_list)
 	_menu_panel.visible = false
 
@@ -490,6 +491,8 @@ func _layout() -> void:
 		return
 	var s := size
 	var narrow := s.x < 900.0
+	if _level_list != null:
+		_level_list.columns = 1 if narrow else 2
 	_clock_label.position = Vector2(s.x * 0.5 - _clock_label.size.x * 0.5, 6)
 	_alert.reset_size()
 	_alert.position = Vector2((s.x - _alert.size.x) * 0.5, 250.0 if s.x >= 900.0 else 330.0)

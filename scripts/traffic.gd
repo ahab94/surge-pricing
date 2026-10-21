@@ -21,6 +21,12 @@ const COLORS := [Color("e74c3c"), Color("3498db"), Color("f1c40f"), Color("ecf0f
 ## Vehicle shapes and behaviour. Lengths and widths are in px (the player's car is 48x26).
 const KINDS := {
 	"car": {"length": 46.0, "width": 24.0, "siren": false},
+	# Local everyday traffic (a city's level picks the mix):
+	"bus": {"length": 84.0, "width": 30.0, "siren": false, "color": Color("d7262b"), "pace": 0.85},
+	"cab": {"length": 46.0, "width": 24.0, "siren": false, "color": Color("f7c600")},
+	"tuktuk": {"length": 32.0, "width": 20.0, "siren": false, "pace": 0.9},
+	"scooter": {"length": 26.0, "width": 11.0, "siren": false},
+	"supercar": {"length": 48.0, "width": 25.0, "siren": false, "pace": 1.15},
 	"trash": {"length": 86.0, "width": 30.0, "siren": false, "color": Color("3f8f4f")},
 	"ambulance": {"length": 60.0, "width": 28.0, "siren": true, "color": Color("f4f4f4")},
 	"police": {"length": 48.0, "width": 25.0, "siren": true, "color": Color("1f2a44")},
@@ -44,26 +50,46 @@ const EVENTS := {
 			"convoy": [["bike", 0.0], ["suv", 55.0], ["suv", 125.0], ["suv", 195.0], ["bike", 255.0]]},
 }
 
+const EVENTS_KINDS := ["trash", "ambulance", "police", "getaway", "suv", "bike"]
+
 var cars: Array = []         # dicts, see _add_car
 var _paths := {}             # [loop, reversed] -> [lane path, total length]
 var _next_id := 0
 var side := 1.0              # +1 keep right, -1 keep left (London, Tokyo...)
 
 
-func setup(city, spec: Array, speed: float) -> void:
+## `mix` turns a share of the ordinary cars into local vehicles, e.g.
+## {"bus": 0.3}. `colors` replaces the default car paint list.
+func setup(city, spec: Array, speed: float, mix := {}, colors := []) -> void:
 	side = -1.0 if city.drive_left else 1.0
 	cars.clear()
 	_paths.clear()
+	var i := 0
 	for entry in spec:
 		var lp: Array = _path_for(city, int(entry[0]), bool(entry[2]))
 		var n := int(entry[1])
 		for k in n:
-			_add_car("car", lp[0], lp[1], lp[1] * k / n, speed)
+			var kind := _local_kind(i, mix)
+			var car := _add_car(kind, lp[0], lp[1], lp[1] * k / n, speed * float(KINDS[kind].get("pace", 1.0)))
+			car.special = false
+			if not colors.is_empty() and not KINDS[kind].has("color"):
+				car.color = colors[i % colors.size()]
+			i += 1
 	for car in cars:
 		_place(car)
 		car.prev_pos = car.pos
 		car.prev_angle = car.angle
 	queue_redraw()
+
+
+## Which kind the i-th ordinary car is, spread evenly by a fixed hash.
+func _local_kind(i: int, mix: Dictionary) -> String:
+	var roll := float((i * 7919 + 13) % 100) / 100.0
+	for kind in mix:
+		roll -= float(mix[kind])
+		if roll < 0.0:
+			return kind
+	return "car"
 
 
 func _path_for(city, loop: int, reversed: bool) -> Array:
@@ -102,7 +128,7 @@ func _right(d: Vector2) -> Vector2:
 func _add_car(kind: String, path: PackedVector2Array, total: float, s: float, speed: float) -> Dictionary:
 	var info: Dictionary = KINDS[kind]
 	var car := {
-		"kind": kind, "id": _next_id, "special": kind != "car",
+		"kind": kind, "id": _next_id, "special": EVENTS_KINDS.has(kind),
 		"path": path, "total": total, "s": s, "top": speed, "speed": speed,
 		"pos": Vector2.ZERO, "dir": Vector2.RIGHT, "angle": 0.0,
 		"length": info.length, "width": info.width, "siren": info.siren,
@@ -245,7 +271,7 @@ func update(dt: float, player) -> void:
 		car.prev_angle = car.angle
 		car.hit_cd = maxf(0.0, car.hit_cd - dt)
 		car.honk = maxf(0.0, car.honk - dt)
-		match car.kind:
+		match car.kind if car.special else "car":
 			"car":
 				# Pull over for sirens: slide toward the kerb and stop.
 				var pull := false

@@ -14,6 +14,7 @@ extends Node2D
 ##   M  hill / rock (solid)          ~  water (solid, unless you jump it)
 ##   ^  ramp: hit it fast to fly
 ##   S  where the car starts         a-z  ride stops (road), named in stop_names
+##   X  scramble crossing (road, painted with zebra stripes every way)
 
 const Cities := preload("res://scripts/cities.gd")
 
@@ -89,7 +90,7 @@ func size_px() -> Vector2:
 ## Road-like: anything you can drive at full speed.
 func is_road(t: Vector2i) -> bool:
 	var c := cell(t)
-	return c == "." or c == "^" or c == "S" or stop_names.has(c)
+	return c == "." or c == "^" or c == "S" or c == "X" or stop_names.has(c)
 
 
 func is_solid(t: Vector2i, airborne := false) -> bool:

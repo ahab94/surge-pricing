@@ -86,22 +86,36 @@ func _live(game) -> void:
 	check(game.money > 0.0, "a drop-off pays")
 	check(game.reviews.size() == reviews_before + 1, "a drop-off leaves a review")
 
-	# Walls stop the car and a hard hit is a crash.
+	# Walls stop the car and a hard hit is a crash: drive west into the first
+	# building that has road just east of it.
 	game.start_level(0)
 	await physics_frame
 	car = game.car
 	city = game.city
+	var wall_road := Vector2i(-1, -1)
+	for y in city.h:
+		for x in range(1, city.w):
+			if wall_road.x < 0 and city.cell(Vector2i(x, y)) == "." and city.cell(Vector2i(x - 1, y)) == "#":
+				wall_road = Vector2i(x, y)
 	var crashes_before: int = game.crashes
-	car.position = city.center(Vector2i(15, 16))
+	car.position = city.center(wall_road)
 	car.heading = PI
 	car.vel = Vector2(-500, 0)
 	for i in 30:
 		await physics_frame
-	check(city.tile_of(car.position).x >= 15, "a building stops the car")
+	check(city.tile_of(car.position).x >= wall_road.x, "a building stops the car")
 	check(game.crashes > crashes_before, "slamming a wall is a crash")
 
-	# Ramps launch the car over the canal.
-	car.position = city.center(Vector2i(15, 19))
+	# Ramps launch the car over water: find a ramp with water just south of it.
+	var ramp := Vector2i(-1, -1)
+	var gap := 0
+	for y in city.h:
+		for x in city.w:
+			if ramp.x < 0 and city.cell(Vector2i(x, y)) == "^" and city.cell(Vector2i(x, y + 1)) == "~":
+				ramp = Vector2i(x, y)
+	while city.cell(ramp + Vector2i(0, gap + 1)) == "~":
+		gap += 1
+	car.position = city.center(ramp + Vector2i(0, -2))
 	car.heading = PI / 2.0
 	car.vel = Vector2(0, 700)
 	car.throttle = 1.0
@@ -113,8 +127,8 @@ func _live(game) -> void:
 			flew = true
 		elif flew and landed_y < 0:
 			landed_y = city.tile_of(car.position).y
-	check(flew, "the canal ramp launches the car")
-	check(landed_y >= 26, "full speed clears the canal (landed y=%d)" % landed_y)
+	check(ramp.x >= 0 and flew, "a ramp launches the car")
+	check(landed_y > ramp.y + gap, "full speed clears the water (landed y=%d, water ends %d)" % [landed_y, ramp.y + gap])
 
 	# Rating is the average of the last reviews; Nana hates speed.
 	check(is_equal_approx(game.rating(), 4.8), "starting rating is 4.8")
