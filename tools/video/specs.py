@@ -31,66 +31,71 @@ def video(vid, orient, segments, cues, intro=0.0, outro=0.0, music_volume=0.55):
 
 
 VIDEOS = [
-    # The trailer: landscape, ~40 s.
+    # The trailer: landscape. Every segment at 1.0x: at 60 fps, fractional
+    # speed-ups drop frames unevenly and the motion judders.
     video("trailer", "landscape",
           segments=[
-              ("l-stunt", 4.3, 14.6, 1.25),   # pick up a streamer, close call, canal jump, 5-star review
-              ("l-stunt", 49.6, 53.4, 1.0),   # ...the next jump falls short
-              ("l-surge", 2.0, 15.2, 1.35),   # surge zone, hustle bro, $77 drop-off
-              ("l-rain", 21.6, 32.2, 1.3),    # rain, Nana, a gentle 5-star ride
-              ("l-stunt", 71.6, 76.9, 1.0),   # splash, retry, splash again
+              ("l-stunt", 4.3, 14.9, 1.0),    # pick up a streamer, canal jump, 5-star review
+              ("l-stunt", 60.6, 64.6, 1.0),   # ...the next jump falls short
+              ("l-surge", 4.5, 15.2, 1.0),    # surge zone, hustle bro, $77 drop-off
+              ("l-chase", 18.6, 22.9, 1.0),   # citizen's arrest... then two cops bumped
+              ("l-rain", 23.0, 33.0, 1.0),    # rain, Nana, a gentle 5-star ride
+              ("l-vip", 9.9, 14.7, 1.0),     # the motorcade: four diplomatic incidents
           ],
           cues=[
               (0, 4.6, 8.2, "cap", "Pick up passengers.\nGet them there. Fast.", "low"),
               (0, 5.13, None, "sfx", "notify", 0.8),
-              (0, 8.55, None, "sfx", "honk", 0.6),
               (0, 10.3, None, "sfx", "slide_up", 0.8),
               (0, 10.4, 11.8, "cap", "SEND IT", "big"),
               (0, 11.27, None, "sfx", "boing", 0.7),
-              (0, 12.0, 14.6, "cap", "Livestreamers tip for chaos.", "low"),
-              (0, 13.52, None, "sfx", "kaching", 0.9),
-              (1, 50.95, None, "sfx", "splash", 1.0),
-              (1, 51.2, 53.4, "cap", "...usually.", "big"),
-              (1, 51.6, None, "sfx", "sad_trombone", 0.7),
-              (2, 2.3, 8.0, "cap", "Surge zones pay DOUBLE.", "low"),
-              (2, 4.12, None, "sfx", "honk", 0.5),
-              (2, 9.0, 15.2, "cap", "Hustle Bros pay extra to go FAST.", "low"),
+              (0, 12.0, 14.9, "cap", "Livestreamers tip for chaos.", "low"),
+              (0, 14.03, None, "sfx", "kaching", 0.9),
+              (1, 61.8, None, "sfx", "slide_up", 0.6),
+              (1, 62.35, None, "sfx", "splash", 1.0),
+              (1, 62.6, 64.6, "cap", "...usually.", "big"),
+              (1, 62.9, None, "sfx", "sad_trombone", 0.7),
+              (2, 4.6, 9.5, "cap", "Surge zones pay DOUBLE.", "low"),
+              (2, 9.8, 15.2, "cap", "Hustle Bros pay extra to go FAST.", "low"),
               (2, 14.45, None, "sfx", "kaching", 0.9),
-              (3, 21.8, 27.5, "cap", "Nana hates speed.", "low"),
-              (3, 27.8, 32.2, "cap", "Your rating is your health bar.", "low"),
-              (3, 31.27, None, "sfx", "kaching", 0.8),
-              (4, 71.8, 73.0, "cap", "One more try.", "big"),
-              (4, 73.22, None, "sfx", "splash", 1.0),
-              (4, 74.4, None, "sfx", "record_scratch", 0.7),
-              (4, 74.4, 75.6, "cap", "Again?!", "big"),
-              (4, 75.68, None, "sfx", "splash", 1.0),
-              (4, 75.9, None, "sfx", "sad_trombone", 0.7),
-              (4, 75.9, 76.9, "cap", "5 stars though.", "big"),
+              (3, 18.6, None, "sfx", "siren", 0.6),
+              (3, 18.7, 21.0, "cap", "Police chase? Join in.", "low"),
+              (3, 21.05, None, "sfx", "kaching", 0.9),
+              (3, 21.28, None, "sfx", "bonk", 0.8),
+              (3, 21.68, None, "sfx", "bonk", 0.8),
+              (4, 23.2, 28.0, "cap", "Nana hates speed.", "low"),
+              (4, 28.2, 33.0, "cap", "Your rating is your health bar.", "low"),
+              (4, 32.32, None, "sfx", "kaching", 0.8),
+              (5, 9.9, 11.5, "cap", "Don't touch the motorcade.", "low"),
+              (5, 11.60, None, "sfx", "bonk", 0.8),
+              (5, 12.55, None, "sfx", "bonk", 0.8),
+              (5, 12.68, None, "sfx", "bonk", 0.8),
+              (5, 13.12, None, "sfx", "bonk", 0.8),
+              (5, 13.25, 14.7, "cap", "-$100", "punch"),
+              (5, 13.4, None, "sfx", "sad_trombone", 0.7),
           ],
           intro=2.6, outro=3.5),
 
-    # A Short: portrait, hook first, the jump, then the double splash.
+    # A Short: portrait, hook first, the jump, the splash, and the review.
     video("short-health-bar", "portrait",
           segments=[
-              ("p-stunt", 4.5, 14.6, 1.3),
-              ("p-stunt", 71.6, 76.9, 1.0),
+              ("p-stunt", 4.5, 14.9, 1.0),
+              ("p-stunt", 60.6, 64.6, 1.0),
+              ("p-stunt", 80.2, 82.9, 1.0),
           ],
           cues=[
               (0, 4.5, 8.6, "cap", "I made a game where your\ndriver rating is your\nHEALTH BAR", "hook"),
               (0, 5.13, None, "sfx", "notify", 0.8),
-              (0, 8.55, None, "sfx", "honk", 0.6),
               (0, 10.3, None, "sfx", "slide_up", 0.8),
               (0, 10.4, 11.9, "cap", "SEND IT", "big"),
               (0, 11.27, None, "sfx", "boing", 0.7),
-              (0, 12.2, 14.6, "cap", "Livestreamers\nlove it", "hook"),
-              (0, 13.52, None, "sfx", "kaching", 0.9),
-              (1, 71.6, 73.0, "cap", "Next ride.\nSame jump.", "big"),
-              (1, 73.22, None, "sfx", "splash", 1.0),
-              (1, 74.4, None, "sfx", "record_scratch", 0.7),
-              (1, 74.4, 75.6, "cap", "AGAIN?!", "big"),
-              (1, 75.68, None, "sfx", "splash", 1.0),
-              (1, 75.9, None, "sfx", "sad_trombone", 0.7),
-              (1, 75.9, 76.9, "cap", "...", "big"),
+              (0, 12.2, 14.9, "cap", "Livestreamers\nlove it", "hook"),
+              (0, 14.03, None, "sfx", "kaching", 0.9),
+              (1, 60.6, 62.2, "cap", "Next ride.\nSame jump.", "big"),
+              (1, 61.8, None, "sfx", "slide_up", 0.6),
+              (1, 62.35, None, "sfx", "splash", 1.0),
+              (1, 62.9, None, "sfx", "sad_trombone", 0.7),
+              (2, 80.2, 82.9, "cap", "1 star.", "punch"),
+              (2, 80.65, None, "sfx", "record_scratch", 0.7),
           ],
           outro=3.0),
 
@@ -98,25 +103,26 @@ VIDEOS = [
     # Same cut in both formats (the portrait and landscape runs are identical).
     *[video(vid, orient,
             segments=[
-                (f"{o}-chase", 12.6, 17.8, 1.0),   # catch the getaway car... and bump a cop
-                (f"{o}-amb", 2.5, 8.0, 1.3),       # everyone pulls over
-                (f"{o}-vip", 9.6, 14.2, 1.0),      # four diplomatic incidents in half a second
+                (f"{o}-chase", 17.6, 22.9, 1.0),   # catch the getaway car... and bump two cops
+                (f"{o}-amb", 2.5, 8.0, 1.0),       # everyone pulls over
+                (f"{o}-vip", 9.3, 14.7, 1.0),      # four diplomatic incidents in half a second
             ],
             cues=[
-                (0, 12.6, 15.6, "cap", "In my rideshare game\nyou can make a\nCITIZEN'S ARREST", "hook"),
-                (0, 12.6, None, "sfx", "siren", 0.5),
-                (0, 15.9, None, "sfx", "bonk", 0.8),
-                (0, 16.0, None, "sfx", "kaching", 0.9),
-                (0, 16.3, 17.8, "cap", "...and a fine for\nbumping the cop.", "low"),
+                (0, 17.6, 20.6, "cap", "In my rideshare game\nyou can make a\nCITIZEN'S ARREST", "hook"),
+                (0, 17.6, None, "sfx", "siren", 0.5),
+                (0, 21.05, None, "sfx", "kaching", 0.9),
+                (0, 21.28, None, "sfx", "bonk", 0.8),
+                (0, 21.68, None, "sfx", "bonk", 0.8),
+                (0, 21.6, 22.9, "cap", "...and two fines for\nbumping the cops.", "low"),
                 (1, 2.5, 8.0, "cap", "Ambulance?\nEveryone pulls over.", "hook"),
                 (1, 2.6, None, "sfx", "siren", 0.6),
-                (2, 9.6, 12.0, "cap", "Rule #1: don't touch\nthe motorcade.", "hook"),
-                (2, 12.13, None, "sfx", "bonk", 0.8),
-                (2, 12.18, None, "sfx", "bonk", 0.8),
-                (2, 12.38, None, "sfx", "bonk", 0.8),
-                (2, 12.52, None, "sfx", "bonk", 0.8),
-                (2, 12.6, 14.2, "cap", "-$100", "punch"),
-                (2, 12.9, None, "sfx", "sad_trombone", 0.7),
+                (2, 9.3, 11.5, "cap", "Rule #1: don't touch\nthe motorcade.", "hook"),
+                (2, 11.60, None, "sfx", "bonk", 0.8),
+                (2, 12.55, None, "sfx", "bonk", 0.8),
+                (2, 12.68, None, "sfx", "bonk", 0.8),
+                (2, 13.12, None, "sfx", "bonk", 0.8),
+                (2, 13.25, 14.7, "cap", "-$100", "punch"),
+                (2, 13.4, None, "sfx", "sad_trombone", 0.7),
             ],
             outro=3.0)
       for vid, orient, o in [("short-citizens-arrest", "portrait", "p"),

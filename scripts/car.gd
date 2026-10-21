@@ -36,6 +36,8 @@ var air_len := 0.0
 var drift_time := 0.0
 var last_safe := Vector2.ZERO
 var events: Array = []
+var prev_pos := Vector2.ZERO       # last tick's pose, for smooth drawing between ticks
+var prev_heading := 0.0
 var skids: Array = []        # recent rear-wheel positions while sliding (drawn by the game)
 var _ramp_cd := 0.0
 var _crash_cd := 0.0
@@ -47,6 +49,8 @@ func setup(p: Vector2, angle: float) -> void:
 	heading = angle
 	rotation = angle
 	last_safe = p
+	prev_pos = p
+	prev_heading = angle
 	vel = Vector2.ZERO
 
 

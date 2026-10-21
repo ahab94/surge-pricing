@@ -13,7 +13,8 @@ extends Node2D
 
 const LANE := 32.0           # distance from the road's centre line to a lane
 const PULL_OVER := 22.0      # how far ordinary cars move toward the kerb
-const SIREN_RANGE := 380.0   # how close a siren must be before cars pull over
+const SIREN_RANGE := 380.0
+const CORNER := 48.0         # radius of the rounded turn at each loop corner   # how close a siren must be before cars pull over
 const COLORS := [Color("e74c3c"), Color("3498db"), Color("f1c40f"), Color("ecf0f1"),
 		Color("9b59b6"), Color("e67e22"), Color("1abc9c"), Color("34495e")]
 
@@ -58,7 +59,8 @@ func setup(city, spec: Array, speed: float) -> void:
 			_add_car("car", lp[0], lp[1], lp[1] * k / n, speed)
 	for car in cars:
 		_place(car)
-		car.angle = car.dir.angle()
+		car.prev_pos = car.pos
+		car.prev_angle = car.angle
 	queue_redraw()
 
 
@@ -113,6 +115,7 @@ func _add_car(kind: String, path: PackedVector2Array, total: float, s: float, sp
 		"busted": -1.0,     # chase: seconds since the getaway car was caught
 		"cycle": 0.0,       # garbage truck: time into its drive/collect cycle
 		"event": "",        # which special event it belongs to
+		"prev_pos": Vector2.ZERO, "prev_angle": 0.0,
 		"index": _next_id,
 	}
 	_next_id += 1
@@ -155,7 +158,8 @@ func spawn_event(name: String, city, rng: RandomNumberGenerator, player_pos: Vec
 		car.shift = -LANE if ev.center else 0.0
 		car.event = name
 		_place(car)
-		car.angle = car.dir.angle()
+		car.prev_pos = car.pos
+		car.prev_angle = car.angle
 
 
 ## The getaway car was rammed: the whole chase stops, then leaves.
@@ -164,6 +168,12 @@ func bust(chase_car: Dictionary) -> void:
 		if car.get("event", "") == "chase":
 			car.busted = 0.0
 	chase_car.honk = 1.5
+
+
+## Where a vehicle will be in `secs` seconds at its current speed (for the
+## bot's interceptions). Ignores corner rounding, which is close enough.
+func future_pos(car: Dictionary, secs: float) -> Vector2:
+	return _point_at(car.path, car.total, car.s + car.speed * secs) + _right(car.dir) * car.shift
 
 
 func _point_at(path: PackedVector2Array, total: float, s: float) -> Vector2:
@@ -178,21 +188,47 @@ func _point_at(path: PackedVector2Array, total: float, s: float) -> Vector2:
 	return path[0]
 
 
+## Puts a vehicle at distance `s` along its loop. Corners are rounded: within
+## CORNER px of a corner the car follows a curve (a quadratic Bezier through
+## the corner point) instead of snapping 90 degrees, so it actually turns.
 func _place(car: Dictionary) -> void:
 	var path: PackedVector2Array = car.path
+	var n := path.size()
 	var s: float = fposmod(car.s, car.total)
-	for i in path.size():
+	for i in n:
 		var a := path[i]
-		var b := path[(i + 1) % path.size()]
+		var b := path[(i + 1) % n]
 		var seg := a.distance_to(b)
-		if s <= seg:
-			car.dir = (b - a) / seg
-			car.pos = a + car.dir * s + _right(car.dir) * car.shift
-			# Turn smoothly over the last bit of each side instead of snapping.
-			var target: float = car.dir.angle()
-			car.angle = lerp_angle(car.angle, target, 0.25) if car.speed > 0 else car.angle
-			return
-		s -= seg
+		if s > seg:
+			s -= seg
+			continue
+		var d := (b - a) / seg
+		var pos := a + d * s
+		var tangent := d
+		if s < CORNER:            # just past corner a: second half of its curve
+			var din := (a - path[(i - 1 + n) % n]).normalized()
+			var c := _curve(a, din, d, (s + CORNER) / (2.0 * CORNER))
+			pos = c[0]
+			tangent = c[1]
+		elif s > seg - CORNER:    # coming up to corner b: first half of its curve
+			var dout := (path[(i + 2) % n] - b).normalized()
+			var c := _curve(b, d, dout, (s - (seg - CORNER)) / (2.0 * CORNER))
+			pos = c[0]
+			tangent = c[1]
+		car.dir = tangent
+		car.pos = pos + _right(tangent) * car.shift
+		car.angle = tangent.angle()
+		return
+
+
+## Point and unit direction on the rounded corner at `v`, t from 0 to 1.
+func _curve(v: Vector2, din: Vector2, dout: Vector2, t: float) -> Array:
+	var p0 := v - din * CORNER
+	var p2 := v + dout * CORNER
+	var u := 1.0 - t
+	var p := u * u * p0 + 2.0 * u * t * v + t * t * p2
+	var tan := (2.0 * u * (v - p0) + 2.0 * t * (p2 - v)).normalized()
+	return [p, tan]
 
 
 # ---------------------------------------------------------------- moving
@@ -203,6 +239,8 @@ func update(dt: float, player) -> void:
 	var gone: Array = []
 	for car in cars:
 		var target: float = car.top
+		car.prev_pos = car.pos       # for smooth drawing between physics ticks
+		car.prev_angle = car.angle
 		car.hit_cd = maxf(0.0, car.hit_cd - dt)
 		car.honk = maxf(0.0, car.honk - dt)
 		match car.kind:

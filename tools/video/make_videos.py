@@ -149,7 +149,7 @@ def duration(path):
 
 
 def cut(src, start, end, speed, path, W, H):
-    vf = f"setpts=PTS/{speed},scale={W}:{H},fps=30"
+    vf = f"setpts=PTS/{speed},scale={W}:{H},fps=60"
     run(["ffmpeg", "-loglevel", "error", "-y", "-ss", str(start), "-to", str(end),
          "-i", os.path.join(FOOTAGE, src + ".mp4"), "-vf", vf, "-an",
          "-c:v", "libx264", "-preset", "fast", "-crf", "16", "-pix_fmt", "yuv420p", path])
@@ -157,7 +157,14 @@ def cut(src, start, end, speed, path, W, H):
 
 def still(png, seconds, path):
     run(["ffmpeg", "-loglevel", "error", "-y", "-loop", "1", "-t", str(seconds), "-i", png,
-         "-vf", "fps=30,format=yuv420p", "-c:v", "libx264", "-preset", "fast", "-crf", "16", path])
+         "-vf", "fps=60,format=yuv420p", "-c:v", "libx264", "-preset", "fast", "-crf", "16", path])
+
+
+def loudness(path):
+    err = subprocess.run(["ffmpeg", "-hide_banner", "-i", path, "-af", "ebur128", "-f", "null", "-"],
+                         capture_output=True, text=True).stderr
+    summary = err[err.rfind("Integrated loudness"):]
+    return float(summary.split("I:")[1].split()[0])
 
 
 def build(v, tmp):
@@ -219,9 +226,16 @@ def build(v, tmp):
     out = os.path.join(OUT, v["id"] + ".mp4")
     run(["ffmpeg", "-loglevel", "error", "-y", "-i", joined, *inputs, *audio_in,
          "-filter_complex", graph, "-map", last, "-map", "[a]",
-         "-c:v", "libx264", "-preset", "slow", "-crf", "18", "-pix_fmt", "yuv420p", "-r", "30",
+         "-c:v", "libx264", "-preset", "slow", "-crf", "18", "-pix_fmt", "yuv420p", "-r", "60",
          "-c:a", "aac", "-b:a", "192k", "-ac", "2", "-movflags", "+faststart", "-t", f"{total:.2f}", out])
-    print(f"{v['id']}: {total:.1f}s -> {os.path.relpath(out, ROOT)}")
+    # One-pass loudnorm lands within a dB or two; measure and nudge to -14 LUFS.
+    gain = -14.0 - loudness(out)
+    if abs(gain) > 0.3:
+        fixed = out + ".tmp.mp4"
+        run(["ffmpeg", "-loglevel", "error", "-y", "-i", out, "-c:v", "copy",
+             "-af", f"volume={gain:.2f}dB,alimiter=limit=0.89", "-c:a", "aac", "-b:a", "192k", fixed])
+        os.replace(fixed, out)
+    print(f"{v['id']}: {total:.1f}s, {loudness(out):.1f} LUFS -> {os.path.relpath(out, ROOT)}")
 
 
 def main():

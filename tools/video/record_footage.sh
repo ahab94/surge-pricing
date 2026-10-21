@@ -22,7 +22,7 @@ record() {  # name level seconds extra-flags...
 	if [ -n "${ONLY:-}" ] && [[ " $ONLY " != *" $name "* ]]; then return; fi
 	local res=1920x1080
 	if [[ $name == p-* ]]; then res=1080x1920; window 1080 1920; else window 1920 1080; fi
-	"$GODOT" --path . --write-movie "$out/$name.avi" --fixed-fps 30 \
+	"$GODOT" --path . --write-movie "$out/$name.avi" --fixed-fps 60 \
 		-- --level="$level" --autopilot --clean --exit-on-end --log-events --timeout="$secs" "$@" \
 		| grep -E "^(EVENT|RESULT)" > "$out/$name.events" || true
 	rm -f override.cfg
@@ -34,13 +34,13 @@ record() {  # name level seconds extra-flags...
 }
 
 ONLY="$*"
-record l-stunt 2 100 --stunts
-record l-surge 5 60
-record l-rain 6 45
-record p-stunt 2 100 --stunts
-# Special traffic: --hunt rams the getaway car / motorcade; --watch-special follows the convoy.
+# 60 fps, and every clip only as long as the edit needs (the sim is
+# deterministic, so a clip always plays out the same from the start).
 for o in l p; do
-	record $o-chase 2 26 --hunt --special=chase --special-at=8 --close-cam
-	record $o-vip 2 20 --hunt --special=motorcade --special-at=6 --close-cam
-	record $o-amb 1 14 --special=ambulance --watch-special --close-cam
+	record $o-stunt 2 83 --stunts --endless --close-cam
+	record $o-chase 2 23 --hunt --special=chase --special-at=10 --close-cam
+	record $o-vip 2 15 --hunt --special=motorcade --special-at=6 --close-cam
+	record $o-amb 1 9 --special=ambulance --watch-special --close-cam
 done
+record l-surge 5 16
+record l-rain 6 33.5

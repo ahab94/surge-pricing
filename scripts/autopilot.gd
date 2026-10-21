@@ -34,11 +34,16 @@ func drive(game) -> Dictionary:
 	var city = game.city
 	var dt := 1.0 / 60.0
 	var prey: Dictionary = _prey(game) if hunt else {}
+	var here0: Vector2i = city.tile_of(car.position)
 	var target := _choose(game)
 	if not prey.is_empty():
-		# Head for a spot ahead of it on its route, to cut it off.
-		var lead: float = minf(car.position.distance_to(prey.pos) * 0.5, 420.0)
-		target = city.tile_of(prey.pos + prey.dir * lead)
+		# Intercept: find where it will be by the time we can get there
+		# (route length / our speed, refined a few times), and go there.
+		var meet: Vector2 = prey.pos
+		for k in 4:
+			var secs: float = city.route(here0, city.tile_of(meet)).size() * city.TILE / 560.0
+			meet = game.traffic.future_pos(prey, secs + 0.6)
+		target = city.tile_of(meet)
 		if not city.is_road(target):
 			target = city.tile_of(prey.pos)
 	_repath -= dt
@@ -73,7 +78,9 @@ func drive(game) -> Dictionary:
 	var lane: Array = _traffic(game, absf(v))
 	var to_aim: Vector2 = (aim - car.position).normalized()
 	aim += Vector2(-to_aim.y, to_aim.x) * float(lane[0])
-	var ramming: bool = not prey.is_empty() and car.position.distance_to(prey.pos) < 280.0
+	# Ram only from the front or side: from behind we'd hit the cruisers first.
+	var ramming: bool = not prey.is_empty() and car.position.distance_to(prey.pos) < 280.0 \
+			and (car.position - prey.pos).dot(prey.dir) > -30.0
 	if ramming:
 		aim = prey.pos + prey.dir * prey.speed * 0.25   # lead the target a little
 	var diff := wrapf((aim - car.position).angle() - car.heading, -PI, PI)

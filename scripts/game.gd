@@ -316,6 +316,8 @@ func _physics_process(delta: float) -> void:
 		car.drift = false
 	# After a splash the car stays under water for a beat (the camera lingers
 	# on the splash) before reappearing on the bank.
+	car.prev_pos = car.position
+	car.prev_heading = car.heading
 	if splash_hold > 0.0:
 		splash_hold -= delta
 		car.vel = Vector2.ZERO
@@ -657,7 +659,7 @@ func _update_surge(delta: float) -> void:
 
 
 func _check_end() -> void:
-	if money >= float(level.goal):
+	if money >= float(level.goal) and not _flags.has("endless"):   # --endless: footage keeps rolling
 		_win()
 	elif rating() < float(level.floor):
 		_lose("DEACTIVATED!", "Your rating fell below %.1f. The app has 'concerns'." % float(level.floor))

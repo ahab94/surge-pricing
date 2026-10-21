@@ -47,6 +47,7 @@ var _mats := {}
 var _cam_target := Vector3.ZERO
 var _menu_angle := 0.0
 var _t := 0.0
+var _smooth_pos := Vector2.ZERO  # the car's position between physics ticks
 
 
 func _ready() -> void:
@@ -526,6 +527,15 @@ func on_level(game) -> void:
 	_cam_target = p3(game.car.position)
 
 
+## Physics runs at a fixed 60 ticks a second, but screens refresh at their
+## own rate (120 Hz, or uneven in a browser). Drawing things exactly where the
+## last tick left them makes them hop; instead blend between the previous and
+## the current tick by how far we are into the next one.
+func car_pos(game) -> Vector2:
+	var car = game.car
+	return car.prev_pos.lerp(car.position, Engine.get_physics_interpolation_fraction())
+
+
 # ---------------------------------------------------------------- traffic
 
 ## Traffic comes and goes (special events), so nodes are matched to vehicles
@@ -538,8 +548,9 @@ func _sync_traffic(game) -> void:
 		if not _vehicles.has(npc.id):
 			_vehicles[npc.id] = _make_vehicle(npc)
 		var v: Dictionary = _vehicles[npc.id]
-		v.node.position = p3(npc.pos)
-		v.node.rotation = Vector3(0, -npc.angle, 0)
+		var f := Engine.get_physics_interpolation_fraction()
+		v.node.position = p3(npc.prev_pos.lerp(npc.pos, f))
+		v.node.rotation = Vector3(0, -lerp_angle(npc.prev_angle, npc.angle, f), 0)
 		v.honk.visible = npc.honk > 0.0
 		v.honk.position = p3(npc.pos, 2.2)
 		for i in v.lights.size():
@@ -654,9 +665,10 @@ func sync(game, delta: float) -> void:
 		return
 	var car = game.car
 	var lift: float = car.get_meta("lift", 0.0)
-	_car.position = p3(car.position, lift * 2.4)
+	_smooth_pos = car_pos(game)
+	_car.position = p3(_smooth_pos, lift * 2.4)
 	_car.visible = game.splash_hold <= 0.0   # sunk, waiting to respawn
-	_car.rotation = Vector3(0, -car.heading, 0)
+	_car.rotation = Vector3(0, -lerp_angle(car.prev_heading, car.heading, Engine.get_physics_interpolation_fraction()), 0)
 	# A little body roll in turns and pitch in the air sells the speed.
 	_car.rotation.x = -car.steer * clampf(car.speed() / 700.0, 0, 1) * 0.12
 	_car.rotation.z = (0.18 * (1.0 - 2.0 * clampf(1.0 - car.air / maxf(car.air_len, 0.01), 0, 1))) if car.air > 0.0 else 0.0
@@ -671,7 +683,7 @@ func _follow_camera(game, delta: float) -> void:
 	var car = game.car
 	var ahead: Vector2 = (car.vel * 0.35).limit_length(220.0)
 	var lim: Vector2 = game.city.size_px()
-	var focus: Vector2 = (car.position + ahead) if game.splash_hold <= 0.0 else game.splash_pos
+	var focus: Vector2 = (_smooth_pos + ahead) if game.splash_hold <= 0.0 else game.splash_pos
 	if game.watch_special():
 		var lead: Dictionary = game.watch_special()
 		focus = lead.pos + lead.dir * 60.0
@@ -712,7 +724,7 @@ func _place_arrow(game, lift: float) -> void:
 	if not _arrow.visible:
 		return
 	_arrow_mat.albedo_color = Color("57e36b") if not game.ride.is_empty() else Color("ffd23f")
-	var base := p3(game.car.position, 2.6 + lift * 2.4 + 0.15 * sin(_t * 5.0))
+	var base := p3(_smooth_pos, 2.6 + lift * 2.4 + 0.15 * sin(_t * 5.0))
 	_arrow.position = base + Vector3(dir.x, 0, dir.y) * 1.2
 	_arrow.rotation = Vector3(0, -dir.angle(), 0)
 
@@ -732,7 +744,7 @@ func _place_popups(game) -> void:
 		l.outline_modulate = Color(0.16, 0.18, 0.21, a)
 		l.font_size = int(p.size * 2.0)
 		var stack: float = p.get("stack", 0.0)
-		l.position = p3(game.car.position, 3.6 + stack * 2.4 + (1.4 - p.t) * 1.2)
+		l.position = p3(_smooth_pos, 3.6 + stack * 2.4 + (1.4 - p.t) * 1.2)
 
 
 # ---------------------------------------------------------------- per-frame overlays
