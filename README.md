@@ -1,12 +1,27 @@
 # Surge Pricing
 
+**▶ [Play free in your browser](https://ahab94.github.io/surge-pricing/)** · [Downloads](https://github.com/ahab94/surge-pricing/releases/latest)
+
+![Surge Pricing: a canal jump with a Livestreamer aboard](docs/surge-pricing.gif)
+
 *Arcade taxi chaos meets the gig economy.* You drive for **Yoink**, a rideshare app that
 pays by the minute and judges you by the star. Pick up passengers, follow the in-app
 route, drive like a maniac for tips, and beat the shift clock. But your **driver rating
 is your health bar**: every passenger leaves a review, and if your rating sinks below
 the floor, the app deactivates you.
 
-Made with Godot 4.7, everything built in code: an angled 3D city over a 2D arcade simulation. Working title; not yet released.
+Passengers talk while you drive ("MY HIP!", "CHAT SAW THAT!"), and police chases,
+ambulances and a VIP motorcade show up when you least need them.
+
+Made with Godot 4.7, everything built in code: an angled 3D city over a 2D arcade
+simulation. No art files, no licensed music. If you enjoy it, a ⭐ on the repo helps a lot.
+
+## Install
+
+- **Browser (phones too):** https://ahab94.github.io/surge-pricing/
+- **macOS / Linux:** `curl -fsSL https://raw.githubusercontent.com/ahab94/surge-pricing/main/install.sh | bash`
+- **Windows (PowerShell):** `irm https://raw.githubusercontent.com/ahab94/surge-pricing/main/install.ps1 | iex`
+- Or grab a zip from [Releases](https://github.com/ahab94/surge-pricing/releases/latest).
 
 ## Controls
 
@@ -16,6 +31,10 @@ Made with Godot 4.7, everything built in code: an angled 3D city over a 2D arcad
 | Drift (handbrake) | Space / Shift | DRIFT button |
 | Brake / reverse | Down / S | BRAKE button |
 | Retry / menu / next | R / Esc / Enter | Buttons |
+
+Every passenger shouts in a speech bubble: Nana on a crash ("I'm calling your mother."),
+the Livestreamer on a jump ("CHAT ARE YOU SEEING THIS?!"), the Hustle Bro on a splash
+("Liquidity event!").
 
 ## How a shift works
 
@@ -91,7 +110,8 @@ Stars per shift: ★ hit the goal, ★★ finish with a rating of 4.7+, ★★�
 ## Roadmap
 
 - [x] v0.1: city, car, traffic, 4 passenger types, 7 shifts, app HUD, reviews, rating floor,
-  touch controls, portrait layout, autopilot gate, tests
+  touch controls, portrait layout, autopilot gate, tests, angled 3D view, special traffic,
+  talking passengers, stunt and hunt bot modes for footage
 - [ ] Your playtest: car feel (speed, grip, drift), zoom, difficulty
 - [ ] Audio: engine hum, honks, splash, cash-register tip, review "ding", adaptive music
   (`tools/make_audio.py`, synthesized, so nothing to license)
@@ -103,10 +123,10 @@ Stars per shift: ★ hit the goal, ★★ finish with a rating of 4.7+, ★★�
   - Food Courier: a soup bag that spills on hard turns.
   - Dog Walker: dogs love open windows and speed.
   - First Date: two riders; awkward if you crash.
-- [ ] Bot "stunt mode" (seeks ramps and the canal jump with a Livestreamer aboard) for footage
 - [ ] Rookie bot for the difficulty curve; per-shift tuning
 - [ ] Endless "Surge Hour" mode with an online-style leaderboard of your best shifts
-- [ ] Pipeline: GitHub (public), web build on Pages, Windows/macOS/Linux, 10+ Shorts
+- [x] Pipeline: GitHub (public), web build on Pages, Windows/macOS/Linux
+- [ ] 10+ Shorts (6 made, see docs/marketing/shorts.md)
 
 ## Development
 
